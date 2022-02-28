@@ -36,8 +36,7 @@ def hinge(x):
         if x[i] < 0:
             y[i] = 0
         else:
-            y[i] = x[i]
-            
+            y[i] = x[i]            
     return y
 
 
@@ -80,7 +79,9 @@ class Controller:
         self.x[self.intn] = self.x[self.intn] + dx*self.p['dt']
         
     def fb_ext(self,z,dc_in): #input from outside CPG
-        self.x = self.x + self.inpw*z + self.d*dc_in*self.p['dt']
+    
+        self.x = self.x + self.inpw*z*self.p['dt'] + self.d*dc_in*self.p['dt']
+
             
 
 """

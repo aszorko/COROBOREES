@@ -21,11 +21,11 @@ def array2param(ind):
     #now all elements of p are on interval [0,1]
     
     param = {
-       'dt': 0.02,
+       'dt': 0.04,
        'b': 0.2*p[0],       # 0.1
        'gam': 0.1*p[1],     # 0.03
        'x0': p[2],          # 0.5
-       'c': -10+20*p[3],    # 3
+       'c': 5*p[3],      #-10+20*p[3],    # 3
        'a': 2*p[4],         # 1
     }
     
@@ -64,16 +64,14 @@ def array2param(ind):
     
     innerweights = np.array([[0,n0+n1*p[17],n2+n3*p[18]],[n0+n1*p[19],0,n2+n3*p[20]],[n2+n3*p[21],n2+n3*p[22],0]])
     
-    initx = np.random.rand(4,3)
+    initx = -np.random.rand(4,3)
     
-    #initial conditions m*n
-    #initx = np.array([[0.1,0,0.1],[0.1,0,0.2],[0.1,0,0.3],[0.1,0,0.4]])
     
     #weight of external input to each controller
     inpc = np.array([1,1,1,1])
     
     #weight of external input to each neuron
-    inpw = np.array([0,0,1])
+    inpw = np.array([1,1,1])
     
 
 
@@ -83,13 +81,14 @@ def array2param(ind):
     return rob
 
 
+#this function lets you play around with setting parameters manually
 def manual_param():
     #m oscillators with n dimensions each
     
     
     ####shared constants
     param = {
-       'dt': 0.02,
+       'dt': 0.04,
        'b': 0.1,
        'gam': 0.03,
        'x0': 0.4,
@@ -112,14 +111,14 @@ def manual_param():
     innerweights = np.array([[0,-2,0],[-2,0,0],[0,0,0]])
     
     #initial conditions m*n
-    initx = np.random.rand(4,3)
+    initx = -np.random.rand(4,3)
     #np.array([[0.1,0,0.1],[0.1,0,0.2],[0.1,0,0.3],[0.1,0,0.4]])
     
     #weight of external input to each controller
     inpc = np.array([1,1,1,1])
     
     #weight of external input to each neuron
-    inpw = np.array([0,0,1])
+    inpw = np.array([1,1,1])
     
     
     
@@ -137,26 +136,22 @@ def manual_param():
     adj = np.block([[a,c],[c,a]]) #np.array([[0,1],[1,0]])
     
     
-       
-    
-    
     cons = [matsuoka_ext.Controller(i,initx[i],innerweights,param,bias,drive,intn,inpw) for i in range(len(initx))]
     rob = roborun.Robot(cons,param,adj,intn,inpc)
 
 
     return rob
 
-
-def run_from_array(ind,plot=False):
-    #interface for genetic algorithm. in=array, out=score
+#interface for genetic algorithm. in=array, out=score
+def run_from_array(ind,plot=False):   
     tt = 40000
     z = np.zeros([tt,1])
 
     #tonic input, one value per simulation
     d_arr = np.arange(0,1.1,0.1)
     rob = array2param(ind)
-    score = roborun.stepdrive(rob,z,d_arr,plot)
-    #print(score)
+    score = roborun.runcpg(rob,z,d_arr,plot)
+
     return score
 
 
@@ -166,27 +161,18 @@ if __name__ == "__main__":
     if len(sys.argv) > 1:
         ind = [x.split(',')[0] for x in sys.argv[1:]]
         rob = array2param(ind)
-    else: #direct from python
-        ind = [10, 1, 1, 9, 8, 4, 9, 2, 8, 5, 1, 1, 1, 4, 6, 4, 1, 5, 10, 6, 10, 5, 4] #0.899
-        #ind = [7, 4, 2, 6, 8, 8, 9, 2, 10, 5, 2, 3, 2, 1, 10, 10, 1, 4, 7, 7, 5, 1, 2] #0.832
-        #ind = [8, 9, 8, 9, 6, 1, 3, 2, 8, 7, 5, 3, 3, 2, 5, 5, 6, 4, 9, 5, 7, 1, 1] #0.782
-        #ind = [10, 3, 6, 6, 5, 10, 6, 3, 4, 4, 1, 3, 1, 6, 9, 4, 10, 6, 3, 1, 5, 3, 6] #0.646
+    else: #direct from python. insert CPG array here to check its period vs DC input
+        ind = [4, 2, 2, 10, 3, 5, 3, 10, 8, 10, 10, 3, 2, 5, 9, 5, 2, 10, 9, 7, 1, 5, 8]
+        
         rob = array2param(ind)
         #rob = manual_param()
 
-    tt = 40000
+    tt = 20000
     z = np.zeros([tt,1])
-    d_arr = np.arange(0,1,0.1)
+    d_arr = np.arange(0,1.1,0.1)
 
-    score = roborun.stepdrive(rob,z,d_arr,plot=True)
+    score = roborun.runcpg(rob,z,d_arr,plot=True)
     print(score)
-
-##running from python
-#if len(sys.argv) == 1:
-#    score = manual_param()
-#running from command line
-#else:
-#    score = array2param(sys.argv[1:])
 
 
 
