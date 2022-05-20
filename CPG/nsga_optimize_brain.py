@@ -8,13 +8,10 @@ Created on Thu Dec  2 13:21:02 2021
 from math import factorial
 import random
 
-#import matplotlib.pyplot as plt
 import numpy
-#import pymop.factory
 
 from deap import algorithms
 from deap import base
-#from deap.benchmarks.tools import igd
 from deap import creator
 from deap import tools
 
@@ -24,16 +21,13 @@ import matsuoka_quad
 
 import sys
 
-# Problem definition
-PROBLEM = "dtlz2"
+N_PROCESSES = 12
+
+#NSGA3 parameters
 NOBJ = 3
-K = 10
-NDIM = NOBJ + K - 1
 P = 10
 H = factorial(NOBJ + P - 1) / (factorial(P) * factorial(NOBJ - 1))
 BOUND_LOW, BOUND_UP = 0.0, 10.0
-#problem = pymop.factory.get_problem(PROBLEM, n_var=NDIM, n_obj=NOBJ)
-##
 
 # Algorithm parameters
 MU = int(H + (4 - H % 4))
@@ -76,7 +70,7 @@ def main(NGEN,n,body,baseperiod,seed=None,skipevery=-1):
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
     toolbox.register("evaluate", matsuoka_brain.run_from_array,n,body,baseperiod,skipevery=skipevery)
 
-    futures = multiprocessing.Pool(12)
+    futures = multiprocessing.Pool(N_PROCESSES)
     toolbox.register("map", futures.map)
     
     # Initialize statistics object
@@ -154,29 +148,3 @@ if __name__ == "__main__":
     print(pop[bestind])
     print(pop[bestind].fitness.values)
     print(bestfit)
-
-    """
-    pf = problem.pareto_front(ref_points)
-    print(igd(pop_fit, pf))
-
-    import matplotlib.pyplot as plt
-    import mpl_toolkits.mplot3d as Axes3d
-
-    fig = plt.figure(figsize=(7, 7))
-    ax = fig.add_subplot(111, projection="3d")
-
-    p = numpy.array([ind.fitness.values for ind in pop])
-    ax.scatter(p[:, 0], p[:, 1], p[:, 2], marker="o", s=24, label="Final Population")
-
-    ax.scatter(pf[:, 0], pf[:, 1], pf[:, 2], marker="x", c="k", s=32, label="Ideal Pareto Front")
-
-    ref_points = tools.uniform_reference_points(NOBJ, P)
-
-    ax.scatter(ref_points[:, 0], ref_points[:, 1], ref_points[:, 2], marker="o", s=24, label="Reference Points")
-
-    ax.view_init(elev=11, azim=-25)
-    ax.autoscale(tight=True)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig("nsga3.png")
-    """
