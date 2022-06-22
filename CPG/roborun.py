@@ -35,13 +35,29 @@ def hinge(x):
     return y
 
 
-def periodinput(zperiod,zstart,zend,tt,dt,skipevery=-1):
+def periodinput(zperiod,zstart,zend,tt,dt,skipevery=-1,sdev=0,seed=None):
+    rng = np.random.default_rng(seed)
     z = np.zeros([tt,1])
     period = round(zperiod/dt)
-    z[zstart:zend:period] = 1
+    inds = np.array(range(zstart,zend,period))
+    noise = np.round(rng.normal(0,sdev*period,len(inds)))
+    inds = inds + noise
+    inds = np.delete(inds,inds<0)
+    inds = np.delete(inds,inds>=tt)
+    z[inds.astype(int)] = 1
     if skipevery>0:
-        z[zstart:zend:(skipevery*period)] = 0
+        z[inds[::skipevery].astype(int)] = 0
     return z
+
+# =============================================================================
+# def periodinput(zperiod,zstart,zend,tt,dt,skipevery=-1,sdev=0):
+#     z = np.zeros([tt,1])
+#     period = round(zperiod/dt)
+#     z[zstart:zend:period] = 1
+#     if skipevery>0:
+#         z[zstart:zend:(skipevery*period)] = 0
+#     return z
+# =============================================================================
 
 def rc_lpf(z,f):
     #exponential impulse response, f=frequency*dt
@@ -58,30 +74,41 @@ class Robot:
         self.adj = adj      #adjacency matrix
         self.intn = intn    #interneuron
         self.inpc = inpc    #each controller's input weight
+
+    #randomise state again
+    def reset(self, seed=None):
+        rng = np.random.default_rng(seed)
+        k = len(self.cons[0].x)
+        for con in self.cons:
+            initx = -rng.random(k)
+            con.x = initx
+            con.y = 0*initx
     
-    def step(self,z,dc_in):
+    
+    def step(self,z,dc_in,dt):
         #z=current external input
         currx = np.array([c.x[self.intn] for c in self.cons])
 
         for i in range(len(self.cons)):
-            self.cons[i].stepx()
-            self.cons[i].fb_int(currx,self.adj)
+            self.cons[i].stepx(dt)
+            self.cons[i].fb_int(currx,self.adj,dt)
             if len(z)>1:                
-               self.cons[i].fb_ext(z[i]*self.inpc[i],dc_in)
+               self.cons[i].fb_ext(z[i]*self.inpc[i],dc_in,dt)
             else:
-               self.cons[i].fb_ext(z[0]*self.inpc[i],dc_in)
+               self.cons[i].fb_ext(z[0]*self.inpc[i],dc_in,dt)
 
         #self.stepglob(z)
         
         return np.array([c.x for c in self.cons])
         
 class Sim:
-    def __init__(self,rob,z,dc_in,brain = None, outw = None, outbias = None):
+    def __init__(self,rob,z,dc_in,dt = 0.04, brain = None, outw = None, outbias = None):
         self.rob = rob
         self.brain = brain
         self.outw = outw
         self.outbias = outbias
         self.tt = len(z)
+        self.dt = dt
         self.input = z
         self.dc_in = dc_in #can be single number or same length as z
         self.allx = [np.zeros([len(self.rob.cons[i].x),self.tt]) for i in range(len(rob.cons))]
@@ -98,7 +125,7 @@ class Sim:
             if self.brain == None:
                 zz = [self.input[t]]
             else:
-                brainx = self.brain.step([self.input[t]],0).squeeze()
+                brainx = self.brain.step([self.input[t]],0,self.dt).squeeze()
                 if usehinge:
                     brainout = hinge(brainx + self.outbias)                    
                 else:
@@ -108,9 +135,9 @@ class Sim:
                 for i in range(len(self.rob.cons)):
                     zz[i,self.rob.intn] = z[i]
             if len(self.dc_in)==1:
-                newx = self.rob.step(zz,self.dc_in[0])
+                newx = self.rob.step(zz,self.dc_in[0],self.dt)
             else:
-                newx = self.rob.step(zz,self.dc_in[t])               
+                newx = self.rob.step(zz,self.dc_in[t],self.dt)               
             for i in range(len(newx)):
                 self.allx[i][:,t] = newx[i]
                 
@@ -123,7 +150,7 @@ class Sim:
 
     def plot(self,tstart=0):
        fig= plt.figure()
-       t = self.rob.param['dt']*np.arange(len(self.input))
+       t = self.dt*np.arange(len(self.input))
        axs1 = fig.add_axes([0.1,0.1,0.45,0.25])
        axs2 = fig.add_axes([0.1,0.4,0.45,0.25])
        axs3 = fig.add_axes([0.1,0.7,0.45,0.25])
@@ -155,7 +182,7 @@ class Sim:
        
     def plotbrain(self):
        plt.figure()
-       t = self.rob.param['dt']*np.arange(len(self.input))
+       t = self.dt*np.arange(len(self.input))
        for i in range(len(self.brain.cons)):
           plt.plot(t,self.brainx[i])   
        plt.show()
@@ -240,8 +267,8 @@ class Sim:
             #print(amps1)
             #print(amps2)
             if len(pks1) > 0:
-                times.append(self.rob.param['dt']*pks1[1:])
-                periods.append(self.rob.param['dt']*np.diff(pks1))
+                times.append(self.dt*pks1[1:])
+                periods.append(self.dt*np.diff(pks1))
             else:
                 times.append([])
                 periods.append([])
@@ -256,10 +283,10 @@ class Sim:
                 x = self.brainx[i][tstart:]
             else:
                 x = self.outx[i][tstart:]
-            pks1, _ = signal.find_peaks(-x,width=t/8/self.rob.param['dt'])
+            pks1, _ = signal.find_peaks(-x,width=t/8/self.dt)
             if len(pks1) > 0:
-                times.append(self.rob.param['dt']*pks1)
-                periods.append(np.mod(self.rob.param['dt']*(pks1-tstart)+t/2,t))
+                times.append(self.dt*pks1)
+                periods.append(np.mod(self.dt*(pks1-tstart)+t/2,t))
             else:
                 times.append([])
                 periods.append([])
@@ -268,7 +295,7 @@ class Sim:
     #not quite working
     def bandpass(self,period):
         x = np.zeros([len(self.rob.cons),self.tt])
-        sos = signal.butter(2, [1/(period+5), 1/(period-5)], 'bandpass', fs=1/self.rob.param['dt'], output='sos')
+        sos = signal.butter(2, [1/(period+5), 1/(period-5)], 'bandpass', fs=1/self.dt, output='sos')
         for i in range(len(self.rob.cons)):
            filtered = signal.sosfilt(sos, self.outx[i])
            x[i,:] = filtered
@@ -279,7 +306,7 @@ class Sim:
         peaks,heights = self.autocorr2(corrstart,mindelay,brain,maxdelay)
         amps = self.getamps(corrstart,brain,minwidth)
         
-        return self.rob.param['dt']*peaks,heights,amps
+        return self.dt*peaks,heights,amps
     
     #duty function, no differential
     def getduty(self,start=0.5):        
@@ -302,20 +329,19 @@ class Sim:
             x2[i,:] = abs(np.diff(hinge(self.allx[i][1,tstart:])))        
         return np.mean(np.sum(x<epsilon,0)>1)/2 + np.mean(np.sum(x2<epsilon,0)>1)/2 
 
-def periodvstime(rob,brain,outw,outbias,tt,t_bounds,t,amp,dc_in,skipevery=-1,plot=True):
-    #change period to mod(peaktime,t)
-    z = amp*100*periodinput(int(t),int(tt*t_bounds[1]),int(tt*t_bounds[2]),tt,rob.param['dt'],skipevery=skipevery)
+def periodvstime(rob,brain,outw,outbias,tt,t_bounds,t,amp,dc_in,dt=0.04, skipevery=-1, sdev=0, plot=True):
+    z = amp*100*periodinput(int(t),int(tt*t_bounds[1]),int(tt*t_bounds[2]),tt,dt,skipevery=skipevery,sdev=sdev)
     z = rc_lpf(z,1/100)
 
     
-    newsim = Sim(rob,z,[dc_in],brain=brain,outw=outw,outbias=outbias)
+    newsim = Sim(rob,z,[dc_in],dt=dt,brain=brain,outw=outw,outbias=outbias)
     newsim.run()
     
     times,periods = newsim.allpeaks2(t_bounds[0],t)
     braintimes,brainperiods = newsim.allpeaks2(t_bounds[0],t,brain=True)
     
     if plot:
-        finalt = rob.param['dt']*tt
+        finalt = dt*tt
         
         tstart = int(tt*t_bounds[0])
     
@@ -341,7 +367,7 @@ def periodvstime(rob,brain,outw,outbias,tt,t_bounds,t,amp,dc_in,skipevery=-1,plo
     
 
 #run the robot for various tonic input levels specified in d_arr
-def stepdrive(rob,z,d_arr,plot=False):  
+def stepdrive(rob,z,d_arr,dt=0.04,plot=False):  
     allperiods = []
     allamp = []
     allcorr = []
@@ -349,7 +375,7 @@ def stepdrive(rob,z,d_arr,plot=False):
     
     for i in range(len(d_arr)):
         newrob = copy.deepcopy(rob)
-        newsim = Sim(newrob,z,[d_arr[i]])
+        newsim = Sim(newrob,z,[d_arr[i]],dt=dt)
         newsim.run()
         periods,corr,amp = newsim.period_amp()
         dutymeasure = newsim.getduty2()
@@ -382,7 +408,7 @@ def stepdrive(rob,z,d_arr,plot=False):
 #run the robot with various periodic drives
 #will iterate through amp_arr (amplitude) if it has length >1
 #otherwise iterate through t_arr (period)    
-def stepdrive_ac(rob,brain,outw,outbias,tt,t_bounds,t_arr,amp_arr,dc_in,decay=0.25,plot=False,brainstats=False,skipevery=-1):
+def stepdrive_ac(rob,brain,outw,outbias,tt,t_bounds,t_arr,amp_arr,dc_in,dt=0.04,decay=0.25,plot=False,brainstats=False,skipevery=-1,sdev=0):
     allperiods = []
     allamp = []
     allcorr = []
@@ -401,15 +427,15 @@ def stepdrive_ac(rob,brain,outw,outbias,tt,t_bounds,t_arr,amp_arr,dc_in,decay=0.
            t = t_arr[i]
            amp = amp_arr[0]
         
-        z = 100*amp*periodinput(t,int(tt*t_bounds[0]),int(tt*t_bounds[1]),tt,rob.param['dt'],skipevery=skipevery) 
-        z = rc_lpf(z,decay*rob.param['dt'])
+        z = 100*amp*periodinput(t,int(tt*t_bounds[0]),int(tt*t_bounds[1]),tt,dt,skipevery=skipevery,sdev=0) 
+        z = rc_lpf(z,decay*dt)
 
         newrob = copy.deepcopy(rob)
         newbrain = copy.deepcopy(brain)
         
-        newsim = Sim(newrob,z,[dc_in],brain=newbrain,outw=outw,outbias=outbias)
+        newsim = Sim(newrob,z,[dc_in],dt=dt,brain=newbrain,outw=outw,outbias=outbias)
         newsim.run()
-        periods,corr,amp = newsim.period_amp(maxdelay=int(maxperiod*t/rob.param['dt']),minwidth=int(minwidth*t/rob.param['dt']))
+        periods,corr,amp = newsim.period_amp(maxdelay=int(maxperiod*t/dt),minwidth=int(minwidth*t/dt))
         if plot:
             newsim.plot()
             newsim.plotbrain()
@@ -483,15 +509,15 @@ def evalbrain(allperiods,allamp,t_arr,zero_std):
     return tuple(np.squeeze(score)) 
 
 #runs CPG and returns fitness
-def runcpg(rob,z,d_arr,plot=False):
-    allperiods,allcorr,allamp,allduty = stepdrive(rob,z,d_arr,plot)
+def runcpg(rob,z,d_arr,dt=0.04,plot=False):
+    allperiods,allcorr,allamp,allduty = stepdrive(rob,z,d_arr,dt=dt,plot=plot)
     return evalrobot(allperiods,allcorr,allamp,allduty)
 
 # runs CPG+brain system first with no input, then with various periods. returns fitness
-def runbrain(rob,brain,outw,outbias,tt,t_bounds,t_arr,dc_in,decay,plot=False,skipevery=-1):
+def runbrain(rob,brain,outw,outbias,tt,t_bounds,t_arr,dc_in,decay,dt=0.04,plot=False,skipevery=-1,sdev=0):
     #first run with no input
     z = np.zeros([tt+1,1])
-    firstsim = Sim(rob,z[:,0],[dc_in],brain=brain,outw=outw,outbias=outbias)
+    firstsim = Sim(rob,z[:,0],[dc_in],dt=dt,brain=brain,outw=outw,outbias=outbias)
     firstsim.run()
     zero_std = np.mean(np.std(firstsim.brainx[:,int(tt/2):],1))
     if plot:
@@ -500,5 +526,5 @@ def runbrain(rob,brain,outw,outbias,tt,t_bounds,t_arr,dc_in,decay,plot=False,ski
        print('no input: std=',zero_std)
     
     #pass to function that iterates through t_arr
-    allperiods,allamp,allbrainperiods,allbrainamp = stepdrive_ac(rob,brain,outw,outbias,tt,t_bounds,t_arr,[1],dc_in,decay,plot=plot,skipevery=skipevery)
+    allperiods,allamp,allbrainperiods,allbrainamp = stepdrive_ac(rob,brain,outw,outbias,tt,t_bounds,t_arr,[1],dc_in,decay,dt=dt,plot=plot,skipevery=skipevery,sdev=sdev)
     return evalbrain(allperiods,allamp,t_arr,zero_std)

@@ -96,8 +96,8 @@ def finaleval(n,bodyarray,brainarray,periods,niter,plot=False,skipevery=-1):
 
 if __name__ == "__main__":
     
-    do_eval     = True # evaluates x 'numiters' and prints median scores 
-    plotall     = True
+    do_eval     = False # evaluates x 'numiters' and prints median scores 
+    plotall     = False
     num_iters   = 2
     skip_every  = 4 #skip every nth pulse for evaluation. set to -1 to use isochronous   
     

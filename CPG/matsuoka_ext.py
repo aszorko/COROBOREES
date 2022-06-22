@@ -61,7 +61,7 @@ class Controller:
         y = self.p['b']*hinge(x) / self.p['gam']
         return y
     
-    def stepx(self): #intra module dynamics
+    def stepx(self,dt): #intra module dynamics
         dx = 0*self.x
         dy = 0*self.x
         for j in range(len(self.x)):
@@ -69,17 +69,18 @@ class Controller:
         
         dy = -self.p['gam']*self.y + self.p['b']*hinge(self.x)
         
-        self.x = self.x + dx*self.p['dt']
-        self.y = self.y + dy*self.p['dt']
+        self.x = self.x + dx*dt
+        self.y = self.y + dy*dt
         
-    def fb_int(self,currx,adj): #inter-module dynamics
+    def fb_int(self,currx,adj,dt): #inter-module dynamics
         #interneuron (assumes all have same bias parameter)
         dx = sum(adj[self.i,:]*hinge(currx))
         
-        self.x[self.intn] = self.x[self.intn] + dx*self.p['dt']
+        self.x[self.intn] = self.x[self.intn] + dx*dt
         
-    def fb_ext(self,z,dc_in): #input from outside CPG
+    def fb_ext(self,z,dc_in,dt): #input from outside CPG
     
-        self.x = self.x + self.inpw*z*self.p['dt'] + self.d*dc_in*self.p['dt']
+        self.x = self.x + self.inpw*z*dt + self.d*dc_in*dt
+
 
 
