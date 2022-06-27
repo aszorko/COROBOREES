@@ -165,7 +165,7 @@ def getlimbcorr(allx,start=0.5):
 
     return maxcorr, maxind
 
-def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brain_in=None, outw=None, outbias=None, tilt_in=None, decay=1, use_controller: bool = True, getperiod=False, nframes=100, maxperiod=-1):
+def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brain_in=None, outw=None, outbias=None, tilt_in=None, decay=1, use_controller: bool = True, getperiod=False, timeseries=False, nframes=100, maxperiod=-1):
     #tilt_in (if not None) must be one less than length of dc_in   
 
     if bodytype=='ODquad':
@@ -256,12 +256,17 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
 
 
 
-    if getperiod:
+    if getperiod or timeseries:
         allx = np.zeros([k,nstages*nframes*stepsperframe], dtype='complex_')
         if brain is not None:
             allbrain = np.zeros([k,nstages*nframes*stepsperframe])
 
-
+    if timeseries:
+        alltilt = np.zeros([1,nstages*nframes]).flatten()
+        allheight = np.zeros([1,nstages*nframes]).flatten()
+        allpardist = np.zeros([1,nstages*nframes]).flatten()
+        allperpdist = np.zeros([1,nstages*nframes]).flatten()
+        
     #prerun the CPG to bypass transients
     for m in range(burnin):
         out = individual.step([0], dc_in[0], dt)
@@ -335,9 +340,19 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
             sidetilt = -obs.obs[0][0][5]*obs.obs[0][0][6] + \
                         obs.obs[0][0][3]*obs.obs[0][0][8]
             fronttilt = obs.obs[0][0][7]
-            tilttot[stage] = tilttot[stage] + np.sqrt(sidetilt**2 + (fronttilt-tilt)**2)
+            
+            currtilt = np.sqrt(sidetilt**2 + (fronttilt-tilt)**2)
+            tilttot[stage] = tilttot[stage] + currtilt
+            currheight = obs.obs[0][0][1] - y0
+            heighttot[stage] = heighttot[stage] + currheight
             tiltcount[stage] = tiltcount[stage] + 1
-            heighttot[stage] = heighttot[stage] + obs.obs[0][0][1] - y0
+
+            if timeseries:
+                allheight[stage*nframes+j] = currheight
+                alltilt[stage*nframes+j] = currtilt
+                allpardist[stage*nframes+j] = obs.obs[0][0][2]
+                allperpdist[stage*nframes+j] = obs.obs[0][0][0]
+            
 
             if j % nframes == 0:
                 stagez[stage] = obs.obs[0][0][2]
@@ -443,7 +458,10 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
         corr = None
         corrind = None
 
-    return (pardist, perpdist, heightmean, tiltmean, period, corr, corrind)
+    if timeseries:
+        return (allpardist, allperpdist, allheight/ymax, alltilt, allx)
+    else:
+        return (pardist, perpdist, heightmean, tiltmean, period, corr, corrind)
 
 
 def iterate(n, dc_arr, tilt_arr, bodytype, env, ind, iterations=3, seed=111):
@@ -550,12 +568,16 @@ def run_from_array(n, bodytype, env, p, dc=[1,0.5,0.5,1], tilt=[-0.015,0.015,0.0
     return tuple(fitout)
 
 
-def run_with_input(env,cpg,body_inds,bodytype,baseperiod,brain,outw,decay,outbias,t_arr,amp,nframes,dc,tilt,graphics=False,skipevery=-1,sdev=0,seed=None):
+def run_with_input(env,cpg,body_inds,bodytype,baseperiod,brain,outw,decay,outbias,t_arr,amp,nframes,dc,tilt,graphics=False,skipevery=-1,sdev=0,tstart=0,tend=1,timeseries=False,seed=None):
     #assumes baseperiod is in simulation seconds
     
     alldist = []
     allheight = []
     allperiod = []
+    allperpdist = []
+    alloutput = []
+    allinput = []
+    alltilt = []
 
     dtUnity = GLOB_DT_UNITY  # time interval of the unity player
     dt = GLOB_DT  # time interval of the simulation
@@ -598,7 +620,7 @@ def run_with_input(env,cpg,body_inds,bodytype,baseperiod,brain,outw,decay,outbia
             seed3 = seed+3*i+2
 
         
-        z = 100*amp*roborun.periodinput(t*tcon*baseperiod,0,tt,tt,dt,skipevery=skipevery,sdev=sdev,seed=seed3)
+        z = 100*amp*roborun.periodinput(t*tcon*baseperiod,int(tt*tstart),int(tt*tend),tt,dt,skipevery=skipevery,sdev=sdev,seed=seed3)
         z = roborun.rc_lpf(z,decay*dt)
         maxperiod = max_r*t*tcon*baseperiod/2
 
@@ -607,14 +629,27 @@ def run_with_input(env,cpg,body_inds,bodytype,baseperiod,brain,outw,decay,outbia
         newbrain = copy.deepcopy(brain)
         if newbrain is not None:
             newbrain.reset(seed2)
-        (pardist, perpdist, heightmean, tiltmean, period, _, _) = evaluate(env, newcpg, body_inds, bodytype, dc_in = [dc,dc], tilt_in=[tilt], brain=newbrain, brain_in=z, outw=outw, outbias=outbias, getperiod=True, nframes=nframes, maxperiod=maxperiod)
-        alldist.append(pardist[0])
-        allheight.append(heightmean[0])
-        allperiod.append(period)
+        if timeseries:
+            (pardist, perpdist, height, tilt, output) = evaluate(env, newcpg, body_inds, bodytype, dc_in = [dc,dc], tilt_in=[tilt], brain=newbrain, brain_in=z, outw=outw, outbias=outbias, getperiod=True, nframes=nframes, maxperiod=maxperiod, timeseries=True)
+            alldist.append(pardist)
+            allheight.append(height)
+            alltilt.append(tilt)
+            allperpdist.append(perpdist)
+            alloutput.append(output)
+            allinput.append(z)
+        else:
+            (pardist, perpdist, heightmean, tiltmean, period, _, _) = evaluate(env, newcpg, body_inds, bodytype, dc_in = [dc,dc], tilt_in=[tilt], brain=newbrain, brain_in=z, outw=outw, outbias=outbias, getperiod=True, nframes=nframes, maxperiod=maxperiod)
+            alldist.append(pardist[0])
+            allheight.append(heightmean[0])
+            allperiod.append(period)
         del newcpg
         del newbrain
 
-    outputs = (alldist,allheight,allperiod,zero_std)
+    if timeseries:
+        outputs = (alldist,allperpdist,allheight,alltilt,allinput,alloutput)
+    else:   
+        outputs = (alldist,allheight,allperiod,zero_std)
+        
     return outputs
 
 
