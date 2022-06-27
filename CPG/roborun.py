@@ -49,16 +49,6 @@ def periodinput(zperiod,zstart,zend,tt,dt,skipevery=-1,sdev=0,seed=None):
         z[inds[::skipevery].astype(int)] = 0
     return z
 
-# =============================================================================
-# def periodinput(zperiod,zstart,zend,tt,dt,skipevery=-1,sdev=0):
-#     z = np.zeros([tt,1])
-#     period = round(zperiod/dt)
-#     z[zstart:zend:period] = 1
-#     if skipevery>0:
-#         z[zstart:zend:(skipevery*period)] = 0
-#     return z
-# =============================================================================
-
 def rc_lpf(z,f):
     #exponential impulse response, f=frequency*dt
     t = np.arange(len(z))
