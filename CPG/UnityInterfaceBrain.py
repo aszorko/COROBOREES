@@ -21,11 +21,13 @@ AMPLITUDE = 2
 num_joints = 20 #controller array size in Unity
 k = 4 #number of limbs
 
-# LIMB ORDER = RF,LF,RH,LH
+# matsuoka_quad limb order = LH,RH,LF,RF
+# Unity limb order = RF,LF,RH,LH
 limblist = [3, 2, 1, 0]  # reordering from CPG script
+#below arrays are used for feedbacks
 frontlimb = np.array([1, 1, -1, -1])
 rightlimb = np.array([1, -1, 1, -1])
-limbamp = -rightlimb  # leg+knee hinges are reversed between left-right
+limbamp = -rightlimb  # leg+knee hinges are reversed between left-right in Unity
 
 burnin = 1000  # iterations of CPG to run before starting
 ramptime = 20  # number of unity frames during which amplitude ramps up
@@ -51,8 +53,8 @@ def getpath(os,bodytype):
                  'shortquad'    :r"../Short/My project.exe"}        
     return paths[bodytype]
 
-
 class WorkerPool:
+    #Queue manager for multiple simultaneous environments.
     queue = None
     
     def __init__(self, function, unitypath, port=9400, nb_workers=6):
@@ -107,6 +109,7 @@ class WorkerPool:
 
 
 def hinge(x):
+    #rectifying linear unit
     y = 0*x
     for i in range(len(x)):
         if x[i] < 0:
@@ -117,6 +120,7 @@ def hinge(x):
 
 
 def sig(x):
+    #sigmoid centred at zero
     return 1 / (1 + np.exp(-x)) - 0.5
 
 
@@ -703,17 +707,38 @@ def run_brain_array(n_brain,cpg,body_inds,baseperiod,bodytype,env,inds,dc=0.5,ti
 if __name__ == "__main__":
     n = 23  # number of CPG parameters
     m = 10  # physical parameters
-    #p = [5 for i in range(n+m)]
+    n_brain = 6 # number of filter neurons
+    
+    #CPG array
+    p = [1, 10, 1, 2, 8, 5, 5, 3, 10, 10, 5, 9, 8, 8, 9, 6, 4, 9, 1, 2, 8, 8, 5, 9, 10, 7, 2, 10, 2, 1, 1, 2]
+    #filter array
+    b = [2, 5, 10, 5, 9, 8, 3, 9, 1, 6, 6, 1, 1, 2, 1, 6, 8, 8, 7, 8, 5, 3, 8, 3, 1, 7, 9, 9, 8, 9, 9, 8, 6, 7, 9, 5, 3, 7, 10, 3, 2, 7, 10, 2, 6, 9, 7, 6, 10, 6, 4, 9, 9, 8, 5, 6, 4, 3, 5, 5, 6, 1]
+    baseperiod = 8.16 #cpg units
+    
+    t0 = 0.0521
+    tmult = t0 #set to 1 if baseperiod is in seconds
+    
+    short = True
+    osys = 'Windows'
+    
+    #function 1: CPG evaluation, function 2: CPG+filter evaluation
+    function = 2
+    
+    if short:
+        bodytype = 'shortquad'
+    else:    
+        bodytype = 'ODquad'
 
-    # forward bounding
-    p = [8, 6, 8, 3, 10, 8, 7, 6, 4, 3, 5, 1, 9, 2, 6, 1, 8,
-         6, 7, 8, 9, 1, 4, 9, 9, 9, 5, 6, 9, 10, 10, 5, 6, 1, 1]
+    Path = getpath(osys,bodytype)
+    env = UnityEnvironment(file_name=Path, seed=4, side_channels=[], worker_id=0, no_graphics=False, additional_args=['-nolog'])
 
-    Path = getpath('Linux','ODquad')
+    if function==1:
+        output = run_from_array(n, bodytype, env, p, nograph=False, seed=111)
+        print(output)
 
-    env = UnityEnvironment(file_name=Path, seed=4, side_channels=[
-    ], worker_id=0, no_graphics=False, additional_args=['-nolog'])
-
-    (fit1, fit2, fit3) = run_from_array(n, env, (0, p), nograph=False)
-
-    print('Avg: ', fit1, fit2, fit3)
+    if function==2:
+        cpg = matsuoka_quad.array2param(p[:n])
+        body_inds = p[n:]
+        output = run_brain_array(6,cpg,body_inds,baseperiod*tmult,bodytype,env,b,graphics=True,skipevery=4,sdev=0.02,seed=111)
+        print(output)
+     
