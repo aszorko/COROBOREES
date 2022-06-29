@@ -1,6 +1,6 @@
 # Central pattern generators evolved for real-time adaptation
 
-Data is contained in the CPG/paper2_data/ directory.
+Data is contained in the `CPG/paper2_data/` directory.
 
 `$python CPG/paper2_results1.py`
 will run analyses on these data and produce Figures 2-5 and statistics.
