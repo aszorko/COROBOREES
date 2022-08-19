@@ -66,13 +66,14 @@ if __name__ == "__main__":
     'seed': 111,
     'combined': False,
     'numiter': numiter,
+    'ratios': [0.618,0.786,1,1.272,1.618]
     }
 
     unitypath = UnityInterfaceBrain.getpath('Linux',bodytype)
 
     for k, path in enumerate(inpaths):
         print(path)
-        outpath = '.'.join(path.split('.')[:-1]) + '_final2.txt'        
+        outpath = '.'.join(path.split('.')[:-1]) + '_final3.txt'        
         data,inds,scores,header = evoplot.main(path,[],getheader=True)
         for line in header:
             if 'body parameters' in line:
