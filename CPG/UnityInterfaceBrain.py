@@ -657,11 +657,10 @@ def run_with_input(env,cpg,body_inds,bodytype,baseperiod,brain,outw,decay,outbia
     return outputs
 
 
-def run_brain_array(n_brain,cpg,body_inds,baseperiod,bodytype,env,inds,dc=0.5,tilt=0,graphics=False,skipevery=-1,numiter=1,sdev=0,seed=None,combined=True):
+def run_brain_array(n_brain,cpg,body_inds,baseperiod,bodytype,env,inds,ratios = [0.618,1,1.618],dc=0.5,tilt=0,graphics=False,skipevery=-1,numiter=1,sdev=0,seed=None,combined=True):
     #called by genetic algorithm. calculates and returns score only
 
     t_arr = []
-    ratios = [0.618,1,1.618]
     amp = 1.0
     nframes = 400
     std_epsilon = 0.1
