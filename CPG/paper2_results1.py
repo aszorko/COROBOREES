@@ -152,7 +152,7 @@ def braindata(file2base,plotmeasures,cpglist=[],plot=False,labels=[],titles=True
                 newfig, axs = plt.subplots(ncols=len(plotmeasures), nrows=1, figsize=(10, 4), gridspec_kw={'wspace':0.25})
                 j=0
             
-            brainfile = file2base + str(run) + '_brain' + str(cpg) + '_final2.txt'
+            brainfile = file2base + str(run) + '_brain' + str(cpg) + '_final3.txt'
             try:
                 _,brains,bscores = evoplot.main(brainfile,[11,12,13],startmode=2)
             except:
@@ -172,6 +172,7 @@ def braindata(file2base,plotmeasures,cpglist=[],plot=False,labels=[],titles=True
                    currheight = np.mean(bscores[-i][::2])
                    currscore = np.mean(bscores[-i][1::2])
                    currbrain = brains[-i]
+                   print(run,cpg,i,currheight,currscore)
                    break
             brainscores.append(currscore)
             brainheights.append(currheight)
@@ -249,7 +250,7 @@ def braindata(file2base,plotmeasures,cpglist=[],plot=False,labels=[],titles=True
             if plot and (run,cpg) in cpglist:
                 if len(labels)>0:
                     plt.gcf().text(0.05, 0.85,labels.pop(0),**textkw)
-                plt.subplots_adjust(bottom=0.12)
+                plt.subplots_adjust(bottom=0.14)
                 allfigs.append(newfig)
                 
     #df = pd.DataFrame(data=np.array([brainscores,brainheights,np.sqrt(np.array(alldy)),np.sqrt(np.array(alldz)),allz,allheight,allind]).T,columns=["brainscore","brainheight","diffperiod","diffcorr","corrmax","height","corrind"])
@@ -260,7 +261,7 @@ def braindata(file2base,plotmeasures,cpglist=[],plot=False,labels=[],titles=True
 if __name__ == "__main__":
     
     #1: plot CPG scatter plots, 2: CPG stats, 3: CPG heat plots, 4: brain stats, 5: brain evolution, 6: get best CPG, 7: CPG evolution, 8: control parameters figure
-    runmode = [1,2,3,4,5,6,7,8]
+    runmode = [4]
 
     mpl.style.use('default')
     textkw = {'fontsize':16}
@@ -415,7 +416,7 @@ if __name__ == "__main__":
     
     if 4 in runmode:
         
-       inds = np.isnan(braindf.diffcorr)==False
+       inds = np.logical_and(np.isnan(braindf.diffcorr)==False,np.isnan(braindf.brainscore)==False)
 
        data2 = braindf[inds]
        meandiff = np.mean(data2.diffperiod)

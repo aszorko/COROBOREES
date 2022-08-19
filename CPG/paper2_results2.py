@@ -19,10 +19,13 @@ if __name__ == "__main__":
     mpl.style.use('ggplot')
     mpl.style.use('seaborn-colorblind')
     p = [1, 10, 1, 2, 8, 5, 5, 3, 10, 10, 5, 9, 8, 8, 9, 6, 4, 9, 1, 2, 8, 8, 5, 9, 10, 7, 2, 10, 2, 1, 1, 2]
-    b = [2, 5, 10, 5, 9, 8, 3, 9, 1, 6, 6, 1, 1, 2, 1, 6, 8, 8, 7, 8, 5, 3, 8, 3, 1, 7, 9, 9, 8, 9, 9, 8, 6, 7, 9, 5, 3, 7, 10, 3, 2, 7, 10, 2, 6, 9, 7, 6, 10, 6, 4, 9, 9, 8, 5, 6, 4, 3, 5, 5, 6, 1]
+    b = [2, 5, 10, 5, 9, 8, 3, 9, 1, 6, 6, 1, 1, 2, 1, 6, 8, 8, 7, 8, 5, 5, 8, 3, 1, 7, 9, 9, 8, 9, 9, 8, 6, 7, 9, 5, 3, 7, 10, 3, 2, 7, 10, 1, 6, 9, 6, 6, 8, 6, 9, 9, 9, 8, 5, 6, 4, 5, 5, 5, 6, 1]
     baseperiod = 8.16 #cpg units
     
     t_arr = [0.8,1.25]
+    
+    
+
     
     n_brain = 6
     m = 4
@@ -36,7 +39,7 @@ if __name__ == "__main__":
     stimstart = 6 #seconds
     stimend = 16 #seconds
     
-    amp = 0.7
+    amp = 1 #S0.7
 
     # unity limb order = RF,LF,RH,LH
     # matsuoka_quad limb order = LH,RH,LF,RF
@@ -52,22 +55,26 @@ if __name__ == "__main__":
     body_inds = p[n_cpg:]
     brain,outw,decay,outbias = matsuoka_brain.array2brain(n_brain,m,b)
     
-    bodytype = 'ODquad'
+    bodytype = 'shortquad'
     Path = UnityInterfaceBrain.getpath('Windows',bodytype)
     env = UnityEnvironment(file_name=Path, seed = 4, side_channels = [], worker_id=0, no_graphics=True, additional_args=['-nolog'])
     
     figlabels = ['A','B']
     textkw = {'fontdict':{'fontsize':16}}
+
+    UnityInterfaceBrain.run_brain_array(n_brain,cpg,body_inds,baseperiod,bodytype,env,b,ratios=t_arr,dc=0.5,tilt=0,graphics=True,skipevery=-1,numiter=1,sdev=0,seed=None,combined=True)
     
     for j in range(len(t_arr)):
+
         (alldist,allperpdist,allheight,alltilt,allinput,alloutput) = UnityInterfaceBrain.run_with_input(env,cpg,body_inds,bodytype,baseperiod,brain,outw,decay,outbias,[t_arr[j]],amp,nframes,0.5,0,skipevery=-1,sdev=0,tstart=stimstart/t_length,tend=stimend/t_length,seed=123,timeseries=True)
         i = 0
 
+        
         outpks = []
         inpks,_ = signal.find_peaks(allinput[i],height=0.01)
         for k in range(4):
             alloutput[i][k,:] = limbamp[k]*alloutput[i][k,:]
-            times,_ = signal.find_peaks(np.diff(np.real(alloutput[i][k,:])),height=0.05,prominence=0.05)
+            times,_ = signal.find_peaks(np.diff(np.real(alloutput[i][k,:])),height=0.05,prominence=0.1)
             outpks.append(times)
     
         fig, axs = plt.subplots(4,1)
@@ -94,6 +101,6 @@ if __name__ == "__main__":
         axs[3].set_xlabel('Time (s)')
         plt.gcf().text(0.01, 0.85,figlabels[j],**textkw)
         plt.show()
-        fig.savefig('paper2_figures/timeseries' + figlabels[j] + '.eps')
+        fig.savefig('paper2_figures/timeseries_v2' + figlabels[j] + '.eps')
     
     env.close()
