@@ -1,5 +1,28 @@
 # Central pattern generators evolved for real-time adaptation
 
+## Running Unity simulations (currently Linux only):
+
+1. Clone branch and unzip files in `CPG/Unity` directory (in this or another location)
+2. Create a python virtual environment using `CPG/requirements.txt` and activate
+3. Set the Linux paths in the `getpaths()` function of `UnityInterfaceBrain.py`
+
+After activating the virtual environment, running
+
+`$python CPG/UnityInterfaceBrain.py`
+
+directly will run a graphical simulation of either the CPG evaluation or the CPG+filter entrainment evaluation. Simulation type, CPGs and filters can be set in the `__main__` function.
+
+
+## Evolution
+
+Evolutions use multiprocessing and are run from the command line (e.g. via Slurm). See code for arguments.
+
+`CPG/nsga_optimize_body.py`: CPG evolution
+
+`CPG/nsga_optimize_unitybrain.py`: filter evolution
+
+## Data
+
 Data is contained in the `CPG/paper2_data/` directory.
 
 `$python CPG/paper2_results1.py`
@@ -8,14 +31,10 @@ will run analyses on these data and produce Figures 2-5 and statistics.
 `$python CPG/paper2_results2.py`
 generates Figure 6 using the Unity interface (see below).
 
-Instructions for running Unity software (currently Linux only):
+Note there are three versions of the final entrainment data:
 
-1. Clone branch and unzip files in `/CPG/Unity` directory (in this or another location)
-2. Create a python virtual environment using `requirements.txt` and activate
-3. Set the Linux paths in the `getpaths()` function of `UnityInterfaceBrain.py`
+`*final.txt`: Same periods as in evolution, combined fitness.
 
-After activating the virtual environment, running
+`*final2.txt`: Same periods as in evolution, fitness separated into period matching and height.
 
-`$python CPG/UnityInterfaceBrain.py`
-
-directly will run a graphical simulation of either the CPG evaluation or the CPG+filter entrainment evaluation. Simulation type, CPGs and filters can be set in the `__main__` function.
+`*final3.txt`: Two additional periods, fitness separated into period matching and height.
