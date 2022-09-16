@@ -1,5 +1,7 @@
 # Rapid rhythmic entrainment in bio-inspired central pattern generators
 
+See paper: https://arxiv.org/abs/2206.01638
+
 Guide to files (see comments inside for details):
 
 `$python CPG/nsga_optimize_cpg.py [# generations] >[output file]`
