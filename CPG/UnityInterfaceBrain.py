@@ -9,6 +9,7 @@ from mlagents_envs.environment import UnityEnvironment
 from multiprocessing import Manager
 from multiprocessing.context import Process
 
+import matplotlib.pyplot as plt
 
 from mlagents_envs.base_env import (
     ActionTuple
@@ -21,23 +22,27 @@ AMPLITUDE = 2
 num_joints = 20 #controller array size in Unity
 k = 4 #number of limbs
 
-# LIMB ORDER = RF,LF,RH,LH
+# matsuoka_quad limb order = LH,RH,LF,RF
+# Unity limb order = RF,LF,RH,LH
 limblist = [3, 2, 1, 0]  # reordering from CPG script
+#below arrays are used for feedbacks
 frontlimb = np.array([1, 1, -1, -1])
 rightlimb = np.array([1, -1, 1, -1])
-limbamp = -rightlimb  # leg+knee hinges are reversed between left-right
+limbamp = -rightlimb  # leg+knee hinges are reversed between left-right in Unity
 
 burnin = 1000  # iterations of CPG to run before starting
 ramptime = 20  # number of unity frames during which amplitude ramps up
 ramp2time = 20 # number of unity frames during which leg offset transitions
 
-
-#Unity parameters = time interval in build settings * frames between decisions
-GLOB_DT = 0.16             
+#time scaling: do not change
 GLOB_MAX_T0 = 0.125
 GLOB_DEF_T0 = 0.4          #multiple of max
+
+#time increment for CPG - does not affect dynamics
+GLOB_DT = 0.15             
+#Unity parameters = time interval in build settings * frames between decisions
 GLOB_DT_UNITY = 0.1        #basic standalone
-GLOB_DT_UNITY_INT = 0.075  #interactive standalone
+GLOB_DT_UNITY_INT = 0.015  #interactive standalone
 
 
 
@@ -46,21 +51,29 @@ def getpath(os,bodytype):
     if os=='Linux':
         paths = {'ODquad'       :r"./Unity/LinuxBuild.x86_64",
                  'shortquad'    :r"./Unity_short/LinuxShort.x86_64"}
+    elif os=='LinuxInt':
+        paths = {'ODquad'       :r"./Unity_int/LinuxInt.x86_64",
+                 'shortquad'    :r"./Unity_int/LinuxInt.x86_64"}
     elif os=='Windows':
         paths = {'ODquad'       :r"../My project/My project.exe",
                  'shortquad'    :r"../Short/My project.exe"}        
+    elif os=='WindowsInt':
+        paths = {'ODquad'       :r"../Interactive/My project.exe",
+                 'shortquad'    :r"../Interactive/My project.exe"}        
     return paths[bodytype]
 
-
 class WorkerPool:
+    #Queue manager for multiple simultaneous environments.
     queue = None
     
-    def __init__(self, function, unitypath, port=9400, nb_workers=6):
+    def __init__(self, function, unitypath, port=9400, nb_workers=6, clargs=[]):
         print('Creating workers')
         self.queue = Manager().Queue()
         self.outqueue = Manager().Queue()
         self.eval = function
-        self.envlist = [UnityEnvironment(file_name=unitypath, seed = 4, base_port=port, side_channels = [], worker_id=i, no_graphics=True) for i in range(nb_workers)]
+        self.envlist = [UnityEnvironment(file_name=unitypath, seed = 4, base_port=port, 
+side_channels = [], worker_id=i, no_graphics=True, additional_args=clargs) for i in 
+range(nb_workers)]
         self.processes = [Process(target=self.process,args=(self.envlist[i],)) for i in range(nb_workers)]
         for p in self.processes:
             p.start()
@@ -107,6 +120,7 @@ class WorkerPool:
 
 
 def hinge(x):
+    #rectifying linear unit
     y = 0*x
     for i in range(len(x)):
         if x[i] < 0:
@@ -117,6 +131,7 @@ def hinge(x):
 
 
 def sig(x):
+    #sigmoid centred at zero
     return 1 / (1 + np.exp(-x)) - 0.5
 
 
@@ -165,8 +180,10 @@ def getlimbcorr(allx,start=0.5):
 
     return maxcorr, maxind
 
-def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brain_in=None, outw=None, outbias=None, tilt_in=None, decay=1, use_controller: bool = True, getperiod=False, timeseries=False, nframes=100, maxperiod=-1):
+def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brain_in=None, outw=None, outbias=None, tilt_in=None, decay=1, use_controller: bool = True, getperiod=False, timeseries=False, interactive = False, arousal=False, sound=False, nframes=100, maxperiod=-1):
     #tilt_in (if not None) must be one less than length of dc_in   
+
+    debug = False
 
     if bodytype=='ODquad':
         ymax = 0.4
@@ -179,7 +196,6 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
         interactive=True
         nstages = 1
     else:
-        interactive=False
         nstages = len(dc_in)-1
         
     controlparams = []
@@ -200,15 +216,14 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
     else:
        t0 = GLOB_MAX_T0 * GLOB_DEF_T0 
 
-    stepsperframe = int(dtUnity / dt / t0)
-
+    stepsperframe = round(dtUnity / dt / t0)
 
     hip_zero = -0.3*p.pop()  # -0.15 #zero-amplitude angle in radians
     leg_zero = 0.5*p.pop()  # 0.25
     knee_zero = -0.8*p.pop()  # -0.4
 
-    leg_amp = 0.5*p.pop()  # 0.35
-    knee_amp = 0.5*p.pop()  # 0.2
+    leg_amp = 0.5*p.pop()*0.1/dtUnity  # 0.35
+    knee_amp = 0.5*p.pop()*0.1/dtUnity  # 0.2
 
 
     knee_front_fb_amp = -0.55 + p.pop()
@@ -236,6 +251,7 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
     hip_fb_amp = -0.05  # <0
     gam1 = 0.05
 
+
     env.reset()
     
     individual_name = 'RobotBehavior?team=0' #list(env._env_specs)[0]
@@ -254,7 +270,9 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
     tiltmean = [0 for i in range(nstages)]
     y0 = -0.48 #-0.68 # floor height
 
-
+    if debug:
+        allaudio = []
+        alltime = []
 
     if getperiod or timeseries:
         allx = np.zeros([k,nstages*nframes*stepsperframe], dtype='complex_')
@@ -276,12 +294,16 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
         oldpos_knee = hinge(np.array([x[1] for x in out]))
     
     brain_filt = 0
+    audio_mav = 0
+    gam = 0.04
+    
+    audio_rampframes = 100
     
     j = -1
     while True:
         
         j += 1
-        if not interactive and j >= nstages*nframes:
+        if nframes>0 and j >= nstages*nframes:
             break
         
         obs, other = env.get_steps(individual_name)
@@ -298,13 +320,13 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
                #print(controlparams.obs[0])
                
         if (len(obs.agent_id) > 0):
-            if not interactive:
+            if nframes>0:
                stage = j // nframes
             else:
                stage = 0
 
             # calculate dc and tilt
-            if not interactive:
+            if nframes>0:
                 dc = dc_in[stage] + (dc_in[stage+1]-dc_in[stage])*(j % nframes)/nframes
                 if tilt_mode == 0:
                    tilt = tilt_in[stage]
@@ -315,7 +337,7 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
                       tilt2 = tilt_in[stage-1] + (tilt_in[stage]-tilt_in[stage-1])*(j % nframes)/ramp2time
                    else:
                       tilt2 = tilt_in[stage]
-                audio_in = 0.0
+                
             elif len(controlparams) > 0:
                 if controlparams[0][0] < -100:
                     print("Exiting")
@@ -329,13 +351,28 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
                     continue
                 tilt2 = controlparams[0][1]
                 dc = controlparams[0][2]
-                audio_in = 10*controlparams[0][3]
+                   
                 tilt = 0.0
             else:
                 dc = dc_in[0]
                 tilt2 = 0.0
                 audio_in = 0.0
                 tilt = 0.0
+                
+            if sound and len(controlparams) > 0:
+                audio_in = 20*controlparams[0][3]*min([j,audio_rampframes])/audio_rampframes
+                if debug:
+                   allaudio.append(audio_in)
+                   alltime.append(time.time())
+
+                audio_mav = (1-gam)*audio_mav + gam*audio_in
+                if j % 100 == 0:
+                   print(audio_mav)
+                   
+                if arousal:
+                    dc = dc + (0.5 - dc)*(0.5+sig(10*(audio_mav-0.5)))
+            else:
+                audio_in = 0.0
                 
             sidetilt = -obs.obs[0][0][5]*obs.obs[0][0][6] + \
                         obs.obs[0][0][3]*obs.obs[0][0][8]
@@ -458,6 +495,16 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
         corr = None
         corrind = None
 
+
+    if debug:
+        timearr = np.array(alltime)-alltime[0]
+        plt.plot(timearr,allaudio)
+        plt.waitforbuttonpress()
+        plt.plot(np.diff(timearr))
+        #plt.hist(np.diff(timearr),bins=20)
+        plt.waitforbuttonpress()
+
+    
     if timeseries:
         return (allpardist, allperpdist, allheight/ymax, alltilt, allx)
     else:
@@ -653,11 +700,10 @@ def run_with_input(env,cpg,body_inds,bodytype,baseperiod,brain,outw,decay,outbia
     return outputs
 
 
-def run_brain_array(n_brain,cpg,body_inds,baseperiod,bodytype,env,inds,dc=0.5,tilt=0,graphics=False,skipevery=-1,numiter=1,sdev=0,seed=None,combined=True):
+def run_brain_array(n_brain,cpg,body_inds,baseperiod,bodytype,env,inds,ratios=[0.618,1,1.618],dc=0.5,tilt=0,graphics=False,skipevery=-1,numiter=1,sdev=0,seed=None,combined=True):
     #called by genetic algorithm. calculates and returns score only
 
     t_arr = []
-    ratios = [0.618,1,1.618]
     amp = 1.0
     nframes = 400
     std_epsilon = 0.1
@@ -703,17 +749,38 @@ def run_brain_array(n_brain,cpg,body_inds,baseperiod,bodytype,env,inds,dc=0.5,ti
 if __name__ == "__main__":
     n = 23  # number of CPG parameters
     m = 10  # physical parameters
-    #p = [5 for i in range(n+m)]
+    n_brain = 6 # number of filter neurons
+    
+    #CPG array
+    p = [1, 10, 1, 2, 8, 5, 5, 3, 10, 10, 5, 9, 8, 8, 9, 6, 4, 9, 1, 2, 8, 8, 5, 9, 10, 7, 2, 10, 2, 1, 1, 2]
+    #filter array
+    b = [2, 5, 10, 5, 9, 8, 3, 9, 1, 6, 6, 1, 1, 2, 1, 6, 8, 8, 7, 8, 5, 3, 8, 3, 1, 7, 9, 9, 8, 9, 9, 8, 6, 7, 9, 5, 3, 7, 10, 3, 2, 7, 10, 2, 6, 9, 7, 6, 10, 6, 4, 9, 9, 8, 5, 6, 4, 3, 5, 5, 6, 1]
+    baseperiod = 8.16 #cpg units
+    
+    t0 = 0.0521
+    tmult = t0 #set to 1 if baseperiod is in seconds
+    
+    short = True
+    osys = 'Windows'
+    
+    #function 1: CPG evaluation, function 2: CPG+filter evaluation
+    function = 2
+    
+    if short:
+        bodytype = 'shortquad'
+    else:    
+        bodytype = 'ODquad'
 
-    # forward bounding
-    p = [8, 6, 8, 3, 10, 8, 7, 6, 4, 3, 5, 1, 9, 2, 6, 1, 8,
-         6, 7, 8, 9, 1, 4, 9, 9, 9, 5, 6, 9, 10, 10, 5, 6, 1, 1]
+    Path = getpath(osys,bodytype)
+    env = UnityEnvironment(file_name=Path, seed=4, side_channels=[], worker_id=0, no_graphics=False, additional_args=['-nolog'])
 
-    Path = getpath('Linux','ODquad')
+    if function==1:
+        output = run_from_array(n, bodytype, env, p, nograph=False, seed=111)
+        print(output)
 
-    env = UnityEnvironment(file_name=Path, seed=4, side_channels=[
-    ], worker_id=0, no_graphics=False, additional_args=['-nolog'])
-
-    (fit1, fit2, fit3) = run_from_array(n, env, (0, p), nograph=False)
-
-    print('Avg: ', fit1, fit2, fit3)
+    if function==2:
+        cpg = matsuoka_quad.array2param(p[:n])
+        body_inds = p[n:]
+        output = run_brain_array(6,cpg,body_inds,baseperiod*tmult,bodytype,env,b,graphics=True,skipevery=4,sdev=0.02,seed=111)
+        print(output)
+     
