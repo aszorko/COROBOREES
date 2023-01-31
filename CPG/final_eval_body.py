@@ -6,15 +6,17 @@ To be run after nsga_optimize_body.py
 Goes through the entire final evolved population and evaluates n times
 Uses multiprocessing
 
-Run and output to file: python final_eval_cpg.py [num processes] [port] [bodytype] [nsga3 output file]
+Run and output to file: python final_eval_cpg.py [num processes] [nsga3 output file]
 
 @author: alexansz
 """
 
-import UnityInterfaceBrain
+import nsga_optimize_body
 import evoplot
-import functools
+import numpy as np
 import sys
+import functools
+import UnityInterfaceBrain
 
 def evalall(pop,workers):
     n = len(pop)
@@ -41,13 +43,20 @@ if __name__ == "__main__":
     inpath = sys.argv[4]
     outpath = inpath.split('.')[0] + '_final.txt'
     
-    data,inds,_ = evoplot.main(inpath,[])
+    data,inds,scores = evoplot.main(inpath,[8,9,10])
 
-    osys = 'Linux'
-    n_iter = 15 # number of times to evaluate
-    
-    expath = UnityInterfaceBrain.getpath(osys,bodytype)
-    function = functools.partial(UnityInterfaceBrain.run_from_array,23,bodytype,seed=111,numiter=n_iter)
+    if 'hex' in bodytype:
+        n_cpg = 28
+        n_body = 9
+        kwargs = {"tilt":[-1,1,1],'k':15,'seed':111}
+    else:
+        n_cpg = 23
+        n_body = 9
+        kwargs = {'k':15,'seed':111}
+
+    function = functools.partial(UnityInterfaceBrain.run_from_array,n_cpg,bodytype,**kwargs)
+    expath = UnityInterfaceBrain.getpath('Linux',bodytype) 
+
     workers = UnityInterfaceBrain.WorkerPool(function,expath,nb_workers=n_processes,port=port)
 
     fitnesses = evalall(inds,workers)

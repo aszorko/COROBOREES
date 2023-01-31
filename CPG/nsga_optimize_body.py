@@ -97,12 +97,21 @@ def eval_all(pop,workers):
 def main(NGEN,outfile,ncpu,bodytype,port=9600,seed=None):
     random.seed(seed)
     
-    function = functools.partial(UnityInterfaceBrain.run_from_array,23,bodytype)
+    if 'hex' in bodytype:
+        n_cpg = 28
+        n_body = 9
+        kwargs = {"tilt":[-1,1,1]}
+    else:
+        n_cpg = 23
+        n_body = 9
+        kwargs = {}
+
+    function = functools.partial(UnityInterfaceBrain.run_from_array,n_cpg,bodytype,**kwargs)
     expath = UnityInterfaceBrain.getpath(osys,bodytype)    
     
     workers = UnityInterfaceBrain.WorkerPool(function,expath,port=port,nb_workers=ncpu)
 
-    toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, n=32)
+    toolbox.register("individual", tools.initRepeat, creator.Individual, toolbox.attr_bool, n=(n_cpg+n_body))
     toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 
     

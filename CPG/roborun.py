@@ -35,11 +35,14 @@ def hinge(x):
     return y
 
 
-def periodinput(zperiod,zstart,zend,tt,dt,skipevery=-1,sdev=0,seed=None):
+def periodinput(zperiod,zstart,zend,tt,dt,skipevery=-1,sdev=0,asym=None,seed=None):
+    #asym is a tuple (int a, float b): every a'th beat is moved by a fraction b where |b|<1
     rng = np.random.default_rng(seed)
     z = np.zeros([tt,1])
     period = round(zperiod/dt)
     inds = np.array(range(zstart,zend,period))
+    if asym is not None:
+        inds[::asym[0]] = inds[::asym[0]] + np.round(asym[1]*period)
     noise = np.round(rng.normal(0,sdev*period,len(inds)))
     inds = inds + noise
     inds = np.delete(inds,inds<0)
@@ -48,6 +51,16 @@ def periodinput(zperiod,zstart,zend,tt,dt,skipevery=-1,sdev=0,seed=None):
     if skipevery>0:
         z[inds[::skipevery].astype(int)] = 0
     return z
+
+# =============================================================================
+# def periodinput(zperiod,zstart,zend,tt,dt,skipevery=-1,sdev=0):
+#     z = np.zeros([tt,1])
+#     period = round(zperiod/dt)
+#     z[zstart:zend:period] = 1
+#     if skipevery>0:
+#         z[zstart:zend:(skipevery*period)] = 0
+#     return z
+# =============================================================================
 
 def rc_lpf(z,f):
     #exponential impulse response, f=frequency*dt

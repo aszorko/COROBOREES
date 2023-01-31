@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Runs all final brain populations several times and gets separate scores for height and entrainment
-Uses multiprocessing
-Usage: python final_eval_unitybrain.py [n_cpu] [bodytype]
+
 
 @author: alexansz
 """
@@ -12,6 +10,7 @@ import evoplot
 import numpy as np
 import UnityInterfaceBrain
 import matsuoka_quad
+import matsuoka_hex
 import os
 import time
 import sys
@@ -33,46 +32,54 @@ def evalall(pop,workers):
          workers.outqueue.task_done()
     return fitnesses
 
-
+def dummy(env,ind):
+    pass
 
 if __name__ == "__main__":
 
+    port = 9200
     n_processes = int(sys.argv[1])
-    if sys.argv[2]=="normal":
-        port = 9200
-        short = False
-    elif sys.argv[2]=="short":
-        port = 9400
-        short = True
+    if sys.argv[2]=="short":
+        datadir = r'./paper2_data/'
+        files = os.listdir(datadir)
+        bodytype = 'shortquad'
+        n_cpg = 23
+        inpaths = [datadir + file for file in files if 'brain' in file and 'short' in file and 'final' not in file]
+    elif sys.argv[2]=="normal":
+        datadir = r'./paper2_data/'
+        files = os.listdir(datadir)
+        n_cpg = 23
+        bodytype = 'ODquad'
+        inpaths = [datadir + file for file in files if 'brain' in file and 'short' not in file and 'final' not in file]
+    elif sys.argv[2]=="hex":
+        datadir = r'./hexdata/'
+        files = os.listdir(datadir)
+        bodytype = 'AIRLhex'
+        n_cpg = 28
+        inpaths = [datadir + file for file in files if 'brain' in file and 'final' not in file]
     else:
         raise ValueError("invalid body type")
         
-    datadir = r'./paper2_data/'
+    datadir = r'./hexdata/'
     files = os.listdir(datadir)
     
-    if short==True:
-       bodytype = 'shortquad'
-       inpaths = [datadir + file for file in files if 'brain' in file and 'short' in file and 'final' not in file]
-    else:
-       bodytype = 'ODquad'
-       inpaths = [datadir + file for file in files if 'brain' in file and 'short' not in file and 'final' not in file]
         
-    n_brain = 6    
-    n_cpg = 23 #number of parameters in CPG generator
+    n_brain = 6
     numiter = 5
     kwargs = {
+    'ratios': [0.618,0.786,1,1.272,1.618],
     'skipevery': 4,
     'sdev':0.02,
     'seed': 111,
     'combined': False,
-    'numiter': numiter,
+    'numiter': numiter
     }
 
     unitypath = UnityInterfaceBrain.getpath('Linux',bodytype)
 
     for k, path in enumerate(inpaths):
         print(path)
-        outpath = '.'.join(path.split('.')[:-1]) + '_final2.txt'        
+        outpath = '.'.join(path.split('.')[:-1]) + '_final.txt'        
         data,inds,scores,header = evoplot.main(path,[],getheader=True)
         for line in header:
             if 'body parameters' in line:
@@ -84,8 +91,10 @@ if __name__ == "__main__":
         print(cpginds)
         print(baseperiod)
         
-        
-        cpg = matsuoka_quad.array2param(cpginds[:n_cpg])
+        if 'hex' in bodytype:
+            cpg = matsuoka_hex.array2param(cpginds[:n_cpg])
+        else:
+            cpg = matsuoka_quad.array2param(cpginds[:n_cpg])
         
         function = functools.partial(UnityInterfaceBrain.run_brain_array,n_brain,cpg,cpginds[n_cpg:],baseperiod,bodytype,**kwargs)
         workers = UnityInterfaceBrain.WorkerPool(function,unitypath,nb_workers=n_processes,port=port+(k%2)*n_processes)
