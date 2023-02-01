@@ -27,8 +27,8 @@ ramptime = 20  # number of unity frames during which amplitude ramps up
 ramp2time = 20 # number of unity frames during which leg offset transitions
 
 #time scaling: do not change
-GLOB_MAX_T0 = 0.125
-GLOB_DEF_T0 = 0.4          #multiple of max
+#GLOB_MAX_T0 = 0.125
+#GLOB_DEF_T0 = 0.4          #multiple of max
 
 #time increment for CPG - does not affect dynamics
 #GLOB_DT = 0.15             
@@ -58,6 +58,11 @@ def getpath(os,bodytype):
     return paths[bodytype]
 
 def gettimestep(bodytype,interactive):
+    #dt_CPG is integration timestep for neurons, with time scaling factor t0
+    #dt_Unity is timestep in Unity simulation
+
+    #CPG steps per unity frame = round(dt_unity / (dt_CPG*t0))
+
     #steps per unity frame = 20 * t_unity / t_CPG
     if 'hex' in bodytype:
         t_unity = 0.015 #0.01
@@ -68,8 +73,10 @@ def gettimestep(bodytype,interactive):
     else:
         t_unity = 0.1
         t_CPG = 0.15
-        
-    return t_unity,t_CPG
+    
+    t0 = 0.05 #do not change    
+    
+    return t_unity,t_CPG,t0
 
 class QuadBody:
     def __init__(self,bodytype,pint):
@@ -292,10 +299,10 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
         nstages = len(dc_in)-1
 
     # dtUnity = time interval of the unity player in seconds
-    dtUnity,dt = gettimestep(bodytype,interactive)
+    dtUnity,dt,t0 = gettimestep(bodytype,interactive)
     # dt = CPG time step
     # t0 = seconds per CPG time step
-    t0 = GLOB_MAX_T0 * GLOB_DEF_T0 
+    #t0 = GLOB_MAX_T0 * GLOB_DEF_T0 
     stepsperframe = round(dtUnity / dt / t0)
 
     k = len(individual.cons) #number of limbs
