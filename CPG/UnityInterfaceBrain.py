@@ -27,8 +27,8 @@ ramptime = 20  # number of unity frames during which amplitude ramps up
 ramp2time = 20 # number of unity frames during which leg offset transitions
 
 #time scaling: do not change
-#GLOB_MAX_T0 = 0.125
-#GLOB_DEF_T0 = 0.4          #multiple of max
+GLOB_MAX_T0 = 0.125
+GLOB_DEF_T0 = 0.4          #multiple of max
 
 #time increment for CPG - does not affect dynamics
 #GLOB_DT = 0.15             
@@ -58,24 +58,18 @@ def getpath(os,bodytype):
     return paths[bodytype]
 
 def gettimestep(bodytype,interactive):
-    #dt_CPG is integration timestep for neurons, with time scaling factor t0
-    #dt_Unity is timestep in Unity simulation
-
-    #CPG steps per unity frame = round(dt_unity / (dt_CPG*t0))
-
+    #steps per unity frame = 20 * t_unity / t_CPG
     if 'hex' in bodytype:
-        dt_unity = 0.015
-        dt_CPG = 0.15
+        t_unity = 0.015 #0.01
+        t_CPG = 0.15 #0.1
     elif interactive:
-        dt_unity = 0.015
-        dt_CPG = 0.15
+        t_unity = 0.015
+        t_CPG = 0.15
     else:
-        dt_unity = 0.1
-        dt_CPG = 0.15
-    
-    t0 = 0.05 #do not change
-
-    return dt_unity,dt_CPG,t0
+        t_unity = 0.1
+        t_CPG = 0.15
+        
+    return t_unity,t_CPG
 
 class QuadBody:
     def __init__(self,bodytype,pint):
@@ -112,6 +106,9 @@ class QuadBody:
         self.rightlimb = np.array([1, -1, 1, -1])
         self.limbdir = np.array([-self.rightlimb,-self.rightlimb,[1,1,1,1]])  # leg+knee hinges are reversed between left-right in Unity
         self.tiltlimb = [1,0,0]
+        
+        self.dirflip = False
+        self.audioamp = 1.0
 
         if len(p)>0:
             raise ValueError(f'p is the wrong length. {len(p)} values left')
@@ -145,6 +142,9 @@ class HexBody:
         self.rightlimb = np.array([-1, -1, -1, 1, 1, 1])
         self.limbdir = np.ones([3,6])
         self.tiltlimb = [0,0,1]
+
+        self.dirflip = True
+        self.audioamp = 0.5
 
         if len(p)>0:
             raise ValueError(f'p is the wrong length. {len(p)} values left')
@@ -235,9 +235,6 @@ def autocorr(allx, start, mindelay, maxdelay=-1):
         x = allx[i, tstart:]
         out[i, :] = np.real(np.correlate(
             x - np.mean(x), x - np.mean(x), mode='full'))
-        #new: remove limbs with no correlation peak
-        if np.argmax(out[i,(len(x)+mindelay):(len(x)+maxdelay)]) == 0:
-            out[i, :] = 0
     outtot = np.sum(out, axis=0)
     peak = mindelay + np.argmax(outtot[(len(x)+mindelay):(len(x)+maxdelay)])
     height = np.max(outtot[len(x)+mindelay:])
@@ -284,12 +281,9 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
 
     if 'hex' in bodytype:
         body = HexBody(bodytype,pint)
-        dirflip = True
-        audioamp = 0.5
     else:
         body = QuadBody(bodytype,pint)
-        dirflip = False
-        audioamp = 1.0
+
 
     if nframes < 0:
         interactive=True
@@ -298,11 +292,10 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
         nstages = len(dc_in)-1
 
     # dtUnity = time interval of the unity player in seconds
-    dtUnity,dt,t0 = gettimestep(bodytype,interactive)
+    dtUnity,dt = gettimestep(bodytype,interactive)
     # dt = CPG time step
     # t0 = seconds per CPG time step
-    #t0 = GLOB_MAX_T0 * GLOB_DEF_T0
-
+    t0 = GLOB_MAX_T0 * GLOB_DEF_T0 
     stepsperframe = round(dtUnity / dt / t0)
 
     k = len(individual.cons) #number of limbs
@@ -341,8 +334,8 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
     controller_name = 'Controls?team=0'
     #print(list(env._env_specs))
     action = np.zeros([1, num_joints])
-    A_fb = np.array([0 for i in range(k)])
-    B_fb = np.array([0 for i in range(k)])
+    #A_fb = np.array([0 for i in range(k)])
+    #B_fb = np.array([0 for i in range(k)])
     body_in = np.array([0 for i in range(k)])
     tilttot = [0 for i in range(nstages)]
     tiltcount = [0 for i in range(nstages)]
@@ -404,7 +397,7 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
             else:
                stage = 0
 
-            # calculate dc and tilt
+            ### calculate control parameters
             if nframes>0:
                 dc = dc_in[stage] + (dc_in[stage+1]-dc_in[stage])*(j % nframes)/nframes
                 
@@ -438,7 +431,8 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
                 tilt2 = 0.0
                 audio_in = 0.0
                 tilt = 0.0
-                
+            
+            ### get audio input 
             if sound and len(controlparams) > 0:
                 audio_in = 20*controlparams[0][3]*min([j,audio_rampframes])/audio_rampframes
                 if debug:
@@ -453,96 +447,59 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
                     dc = dc + (0.5 - dc)*(0.5+sig(10*(audio_mav-0.5)))
             else:
                 audio_in = 0.0
-                
-            sidetilt = -obs.obs[0][0][5]*obs.obs[0][0][6] + \
-                        obs.obs[0][0][3]*obs.obs[0][0][8]
-            fronttilt = obs.obs[0][0][7]
             
-            currtilt = np.sqrt(sidetilt**2 + (fronttilt-tilt)**2)
+            
+            ### get observations
+            
+            currpardist,currperpdist,currheight,sidetilt,fronttilt,currtilt,orient = getobs(obs.obs[0][0],body)
+
             tilttot[stage] = tilttot[stage] + currtilt
-            currheight = obs.obs[0][0][1] - body.y0
             heighttot[stage] = heighttot[stage] + currheight
             tiltcount[stage] = tiltcount[stage] + 1
-
+            
             if timeseries:
                 allheight[stage*nframes+j] = currheight
                 alltilt[stage*nframes+j] = currtilt
-                allpardist[stage*nframes+j] = obs.obs[0][0][2]
-                allperpdist[stage*nframes+j] = obs.obs[0][0][0]
+                allpardist[stage*nframes+j] = currpardist
+                allperpdist[stage*nframes+j] = currperpdist
+                
+            ### start-of-stage measurements
             
-
             if j % nframes == 0:
-                stagez[stage] = obs.obs[0][0][2]
-                stagex[stage] = obs.obs[0][0][0]
-                stageorient[stage] = math.atan2(obs.obs[0][0][6], obs.obs[0][0][8])
+                stagez[stage] = currpardist
+                stagex[stage] = currperpdist
+                stageorient[stage] = orient
+
+            ### step CPG x stepsperframe
 
             if (use_controller):
-                for m in range(stepsperframe):
-                    # sidetilt = y component of right-facing vector (which =cross product of top and forward vectors)
-                    sidetilt = -obs.obs[0][0][5]*obs.obs[0][0][6] + \
-                        obs.obs[0][0][3]*obs.obs[0][0][8]
-                    fronttilt = obs.obs[0][0][7]
-                    A_fb = body.A_side_fb_amp*body.rightlimb*sidetilt + \
-                        body.A_front_fb_amp*body.frontlimb*(fronttilt-tilt)
-                    B_fb = body.B_side_fb_amp*body.rightlimb*sidetilt + \
-                        body.B_front_fb_amp*body.frontlimb*(fronttilt-tilt)
-                    
-                    if brain_in is not None:
-                        #pre-filtered from time series
-                        brain_filt = brain_in[j*stepsperframe+m]
-                    else:
-                        #brain_filt = brain_filt - brain_filt*decay*dt + audio_in*dt
-                        brain_filt = audio_in*audioamp 
-                        
-                    if brain is not None:
-                        #filtered input goes via brain
-                        brainx = brain.step([brain_filt],0,dt).squeeze()
-                        brain_out = hinge(brainx + outbias)
-                        body_in = np.matmul(outw,brain_out)
-                        if getperiod:
-                            allbrain[:, j*stepsperframe+m] = body_in
-                        z = [[A_fb[i], B_fb[i], body_in[i]] for i in range(k)]
-                    else:
-                        #filtered input goes directly (can still be zero)
-                        z = [[A_fb[i], B_fb[i], brain_filt/10] for i in range(k)]
+                
+                if brain_in is not None:
+                    #pre-filtered from time series
+                    brain_filt = brain_in[j*stepsperframe:(j+1)*stepsperframe]
+                else:
+                    brain_filt = [audio_in*body.audioamp for i in range(stepsperframe)] 
 
-                    out = individual.step(z, dc, dt)
-                    newpos = np.array([hinge(x) for x in out])
-                    
-                    if getperiod:
-                        allx[:, j*stepsperframe+m] = body.limbdir[0,:]*newpos[:,0] + 1j*body.limbdir[1,:]*newpos[:,1]
+                
+                body_out,body_in = stepind(body,individual,brain,stepsperframe,dt,dc,sidetilt,fronttilt-tilt,brain_filt,outw,outbias)
+
                 if j < ramptime:
                     ramp = j/ramptime
                 else:
                     ramp = 1
-
-
-                if dirflip: #tilt (-1 to 1) becomes sign of angles
-                    direction = tilt2
-                    tilt_out = 0
-                else:       #tilt added to leg angle
-                    direction = 1
-                    tilt_out = tilt2
-
-
-                pos_diff = (oldpos[body.limblist]-newpos[body.limblist])/dtUnity
-
-                #if hipfeedback and obs.obs[0][0][0]*0==0:
-                #   hip_int = hip_int*(1 - gam1) + hip_fb_amp*sidetilt
-                #   hip_fb = body.rightlimb*hip_int
-                
-                d = [1 + body.tiltlimb[i]*(direction-1) for i in range(3)]
-
-                leg_angs = np.array([sum(body.leg_amp*x*d[0]) for x in pos_diff])
-                knee_angs = np.array([sum(body.knee_amp*x*d[1]) for x in pos_diff])
-                hip_angs = np.array([sum(body.hip_amp*x*d[2]) for x in pos_diff])
-
-                action[0, :k] = body.limbdir[0]*(2*ramp*body.anglimit[0]*sig(2*leg_angs/body.anglimit[0]) + body.leg_zero + tilt_out*body.tiltlimb[0])
-                action[0, k:2*k] = body.limbdir[1]*(2*ramp*body.anglimit[1]*sig(2*knee_angs/body.anglimit[1]) + body.knee_zero + tilt_out*body.tiltlimb
-[1])
-                action[0, 2*k:3*k] = body.limbdir[2]*(2*ramp*body.anglimit[2]*sig(2*hip_angs/body.anglimit[2]) + body.hip_zero + tilt_out*body.tiltlimb
-[2]) # + hip_fb
+                    
+                newpos = body_out[-1,:,:]
+                pos_diff = ramp*(oldpos[body.limblist]-newpos[body.limblist])/dtUnity
                 oldpos = newpos
+                
+                if getperiod:
+                    for m in range(stepsperframe):
+                       allx[:, j*stepsperframe+m] = body.limbdir[0,:]*body_out[m,:,0] + 1j*body.limbdir[1,:]*body_out[m,:,1]
+                       allbrain[:, j*stepsperframe+m] = body_in[m,:]   
+                        
+                newactions = getactions(body,pos_diff,tilt2)    
+                action[0,:] = newactions
+
             else:
                 # sine wave actions (old code, may not work)
                 for i in range(len(action[0])):
@@ -610,6 +567,82 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
     else:
         return (pardist, perpdist, heightmean, tiltmean, period, corr, corrout)
 
+
+def getobs(obs,body):
+    
+    sidetilt = -obs[5]*obs[6] + obs[3]*obs[8]
+    fronttilt = obs[7]
+    tot_tilt = np.sqrt(sidetilt**2 + fronttilt**2)
+
+    currheight = obs[1] - body.y0
+    
+    pardist = obs[2]
+    perpdist = obs[0]
+    
+    orient = math.atan2(obs[6], obs[8]) 
+    
+    return pardist,perpdist,currheight,sidetilt,fronttilt,tot_tilt,orient
+
+def getactions(body,pos_diff,tilt_control):
+    #assumes three joints per limb
+    
+    k = len(body.limblist)
+    if body.dirflip: #tilt (-1 to 1) becomes sign of angles
+        direction = tilt_control
+        tilt_out = 0
+    else:       #tilt added to leg angle
+        direction = 1
+        tilt_out = tilt_control                
+    
+    #tiltlimb=0 -> d=1; tiltlimb=1 -> d=direction
+    d = [1 + body.tiltlimb[i]*(direction-1) for i in range(3)]
+
+    leg_angs = np.array([sum(body.leg_amp*x*d[0]) for x in pos_diff])
+    knee_angs = np.array([sum(body.knee_amp*x*d[1]) for x in pos_diff])
+    hip_angs = np.array([sum(body.hip_amp*x*d[2]) for x in pos_diff])
+
+    action = np.array([0.0 for i in range(num_joints)])
+    
+    action[:k] = body.limbdir[0]*(2*body.anglimit[0]*sig(2*leg_angs/body.anglimit[0]) + body.leg_zero + tilt_out*body.tiltlimb[0])
+    action[k:2*k] = body.limbdir[1]*(2*body.anglimit[1]*sig(2*knee_angs/body.anglimit[1]) + body.knee_zero + tilt_out*body.tiltlimb[1])
+    action[2*k:3*k] = body.limbdir[2]*(2*body.anglimit[2]*sig(2*hip_angs/body.anglimit[2]) + body.hip_zero + tilt_out*body.tiltlimb[2]) # + hip_fb
+    
+    return action
+
+
+def stepind(body,cpg,brain,stepsperframe,dt,dc,sidetilt,fronttilt,brain_filt,outw,outbias):
+    
+    k = len(cpg.cons)
+    j = len(cpg.cons[0].x)
+    
+    allbodyin = np.zeros([stepsperframe,k])
+    allbodyout = np.zeros([stepsperframe,k,j])
+    
+    for m in range(stepsperframe):
+
+        A_fb = body.A_side_fb_amp*body.rightlimb*sidetilt + \
+            body.A_front_fb_amp*body.frontlimb*(fronttilt)
+        B_fb = body.B_side_fb_amp*body.rightlimb*sidetilt + \
+            body.B_front_fb_amp*body.frontlimb*(fronttilt)
+        
+            
+        if brain is not None:
+            #filtered input goes via brain
+            brainx = brain.step([brain_filt[m]],0,dt).squeeze()
+            brain_out = hinge(brainx + outbias)
+            body_in = np.matmul(outw,brain_out)
+            allbodyin[m,:] = body_in
+
+            z = [[A_fb[i], B_fb[i], body_in[i]] for i in range(k)]
+        else:
+            #filtered input goes directly (can still be zero)
+            z = [[A_fb[i], B_fb[i], brain_filt[m]/10] for i in range(k)]
+
+        out = cpg.step(z, dc, dt)
+        allbodyout[m,:,:] = np.array([hinge(x) for x in out])
+        
+        
+    return allbodyout,allbodyin
 
 def iterate(n, dc_arr, tilt_arr, bodytype, env, ind, iterations=3, seed=111):
 
@@ -811,7 +844,6 @@ def run_with_input(env,cpg,body_inds,bodytype,baseperiod,brain,outw,decay,outbia
         outputs = (alldist,allheight,allperiod,zero_std)
         
     return outputs
-
 
 def run_brain_array(n_brain,cpg,body_inds,baseperiod,bodytype,env,inds,ratios=[0.618,1,1.618],dc=0.5,tilt=0,numiter=1,combined=True,graphics=False,**kwargs):
     #called by genetic algorithm. calculates and returns score only
