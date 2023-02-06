@@ -242,6 +242,9 @@ def autocorr(allx, start, mindelay, maxdelay=-1):
         x = allx[i, tstart:]
         out[i, :] = np.real(np.correlate(
             x - np.mean(x), x - np.mean(x), mode='full'))
+        #new: remove limbs with no correlation peak
+        if np.argmax(out[i,(len(x)+mindelay):(len(x)+maxdelay)]) == 0:
+            out[i, :] = 0
     outtot = np.sum(out, axis=0)
     peak = mindelay + np.argmax(outtot[(len(x)+mindelay):(len(x)+maxdelay)])
     height = np.max(outtot[len(x)+mindelay:])
