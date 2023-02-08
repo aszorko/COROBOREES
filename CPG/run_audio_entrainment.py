@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Runs all final brain populations several times and gets separate scores for height and entrainment
+Runs best brain for each CPG with audio clips, gets entrainment scores
 Uses multiprocessing
-Usage: python final_eval_unitybrain.py [n_cpu] [bodytype]
+Usage: run_audio_entrainment.py [bodytype]
 
 @author: alexansz
 """
