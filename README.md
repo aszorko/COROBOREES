@@ -5,12 +5,13 @@
 
 (link to Youtube video)
 
-## Unity executable (*to be uploaded*)
+## Unity executables (Linux only)
 
+Download and unpack Unity_short.zip and Unity_int.zip to the CPG folder. Make sure the Linux executable paths in UnityInterfaceBrain.py are correct.
 
 ## Evaluation
 
-These use multiprocessing and are run from the command line (e.g. via Slurm). See code for arguments.
+These scripts use multiprocessing and are run from the command line in the virtual environment (e.g. via Slurm, see master branch for info). See code for arguments.
 
 `CPG/run_impulse_entrainment.py`: test entrainment to various pulses
 
@@ -24,5 +25,5 @@ Data is contained in the `CPG/paper3_data/` directory.
 will run analyses on these data and produce Figures 2&4 and statistics.
 
 `$python CPG/paper3_results2.py`
-generates Figure 3 using the Unity interface (see below).
+generates Figure 3 using the Unity interface. Must be run from command line in the virtual environment.
 
