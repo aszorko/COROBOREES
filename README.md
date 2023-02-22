@@ -19,7 +19,21 @@ Evolutions use multiprocessing and are run from the command line (e.g. via Slurm
 
 `CPG/nsga_optimize_body.py`: CPG evolution
 
-`CPG/nsga_optimize_unitybrain.py`: filter evolution
+`CPG/nsga_optimize_unitybrain.py`: Filter evolution. Uses CPGs contained in the main function.
+
+## Post-evolution steps
+
+The final generations are then run for more iterations and more periods in the case of the filter. These use multiprocessing and are run from the command line. See code for arguments.
+
+`CPG/final_eval_body.py`: final CPG evaluation
+
+`CPG/final_eval_unitybrain.py`: final filter evolution
+
+## Other scripts
+
+`CPG/evoplot.py`: functions to analyse evolution output and select CPGs from the Pareto front
+
+`CPG/getperiods.py`: iterates over control parameters and extracts periods, correlations and other measures
 
 ## Data
 
