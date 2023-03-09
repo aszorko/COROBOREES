@@ -1,4 +1,8 @@
-# Central pattern generators evolved for real-time adaptation
+# Central pattern generators evolved for real-time adaptation to rhythmic stimuli
+
+[![Youtube: example of entrainment in simulation](https://img.youtube.com/vi/k9cmEjPEbkM/0.jpg)](https://www.youtube.com/watch?v=k9cmEjPEbkM)
+
+(link to Youtube video)
 
 ## Running Unity simulations (currently Linux only):
 
