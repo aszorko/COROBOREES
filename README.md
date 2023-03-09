@@ -4,7 +4,7 @@
 The master branch is updated continuously. Branches are made for reproduction of paper-specific data.
 
 ## Installing:
-Clone the repository and create a Python virtual environment using CPG/requirements.txt.
+Clone the repository. To enable the Unity simulations (currently Linux only), create a Python virtual environment using CPG/requirements.txt.
 
 ## Paper1: Rapid rhythmic entrainment in bio-inspired central pattern generators
 
