@@ -19,20 +19,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import copy
 from scipy import signal
-
-
-def sig(x):
-    return 1 / (1 + np.exp(-x))
-
-def hinge(x):
-    y = 0*x
-    for i in range(len(x)):
-        if x[i] < 0:
-            y[i] = 0
-        else:
-            y[i] = x[i]
-            
-    return y
+from MathUtils import hinge
 
 
 def periodinput(zperiod,zstart,zend,tt,dt,skipevery=-1,sdev=0,asym=None,seed=None):
@@ -49,18 +36,8 @@ def periodinput(zperiod,zstart,zend,tt,dt,skipevery=-1,sdev=0,asym=None,seed=Non
     inds = np.delete(inds,inds>=tt)
     z[inds.astype(int)] = 1
     if skipevery>0:
-        z[inds[::skipevery].astype(int)] = 0
+        z[inds[::skipevery].astype(int)] = 0        
     return z
-
-# =============================================================================
-# def periodinput(zperiod,zstart,zend,tt,dt,skipevery=-1,sdev=0):
-#     z = np.zeros([tt,1])
-#     period = round(zperiod/dt)
-#     z[zstart:zend:period] = 1
-#     if skipevery>0:
-#         z[zstart:zend:(skipevery*period)] = 0
-#     return z
-# =============================================================================
 
 def rc_lpf(z,f):
     #exponential impulse response, f=frequency*dt
@@ -86,8 +63,7 @@ class Robot:
             initx = -rng.random(k)
             con.x = initx
             con.y = 0*initx
-    
-    
+            
     def step(self,z,dc_in,dt):
         #z=current external input
         currx = np.array([c.x[self.intn] for c in self.cons])
