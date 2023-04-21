@@ -35,7 +35,7 @@ def hinge(x):
     return y
 
 
-def periodinput(zperiod,zstart,zend,tt,dt,skipevery=-1,sdev=0,asym=None,seed=None):
+def periodinput(zperiod,zstart,zend,tt,dt,skipevery=-1,sdev=0,asym=None,pattern=None,seed=None):
     #asym is a tuple (int a, float b): every a'th beat is moved by a fraction b where |b|<1
     rng = np.random.default_rng(seed)
     z = np.zeros([tt,1])
@@ -50,6 +50,11 @@ def periodinput(zperiod,zstart,zend,tt,dt,skipevery=-1,sdev=0,asym=None,seed=Non
     z[inds.astype(int)] = 1
     if skipevery>0:
         z[inds[::skipevery].astype(int)] = 0
+    elif pattern is not None:
+        m = len(pattern)
+        for i in range(m):
+            if not pattern[i]:
+                z[inds[i::m].astype(int)] = 0
     return z
 
 # =============================================================================
