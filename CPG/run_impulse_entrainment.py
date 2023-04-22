@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Runs best brain for each CPG with various pulses (frequency, asymmetry, amplitude), gets entrainment scores
+Runs all final brain populations several times and gets separate scores for height and entrainment
 Uses multiprocessing
-Usage: run_impulse_entrainment.py [bodytype]
+Usage: python final_eval_unitybrain.py [n_cpu] [bodytype]
 
 @author: alexansz
 """
@@ -20,7 +20,7 @@ import sys
 
 
 
-def evalone(n_brain,n_cpg,n_body,bodytype,dc_in,t_arr,amp_arr,asym_fracs,env,ind,numiter=5,nframes=1600,seed=None):
+def evalone(n_brain,n_cpg,n_body,bodytype,dc_in,t_arr,amp_arr,asym,pattern,env,ind,numiter=5,nframes=1600,seed=None):
 
     cpg_inds = ind[:n_cpg]
     body_inds = ind[n_cpg:(n_cpg+n_body)]
@@ -39,8 +39,8 @@ def evalone(n_brain,n_cpg,n_body,bodytype,dc_in,t_arr,amp_arr,asym_fracs,env,ind
     
     if len(amp_arr)>1:
         dim2 = len(amp_arr)
-    elif asym_fracs is not None:
-        dim2 = len(asym_fracs)
+    elif asym is not None and hasattr(asym[1], '__iter__'):
+        dim2 = len(asym[1])
     else:
         dim2 = len(dc_in)
 
@@ -53,17 +53,17 @@ def evalone(n_brain,n_cpg,n_body,bodytype,dc_in,t_arr,amp_arr,asym_fracs,env,ind
         seed1 = seed+j*len(t_arr)
         if len(amp_arr)>1:
             for i,amp in enumerate(amp_arr):
-                (dist,height,period,zero_std) = UnityInterfaceBrain.run_with_input(env,cpg,body_inds,bodytype,1,brain,outw,decay,outbias,t_arr,amp,nframes,dc_in[0],0,seed=seed1,asym=None)
+                (dist,height,period,zero_std) = UnityInterfaceBrain.run_with_input(env,cpg,body_inds,bodytype,1,brain,outw,decay,outbias,t_arr,amp,nframes,dc_in[0],0,seed=seed1,asym=asym,pattern=pattern)
                 allperiod[j,:,i] = period
                 allheight[j,:,i] = height
-        elif asym_fracs is not None:
-            for i,asym_frac in enumerate(asym_fracs):
-                (dist,height,period,zero_std) = UnityInterfaceBrain.run_with_input(env,cpg,body_inds,bodytype,1,brain,outw,decay,outbias,t_arr,amp_arr[0],nframes,dc_in[0],0,seed=seed1,asym=(2,asym_frac))
+        elif asym is not None and hasattr(asym[1], '__iter__'):
+            for i,asym_frac in enumerate(asym[1]):
+                (dist,height,period,zero_std) = UnityInterfaceBrain.run_with_input(env,cpg,body_inds,bodytype,1,brain,outw,decay,outbias,t_arr,amp_arr[0],nframes,dc_in[0],0,seed=seed1,asym=(asym[0],asym_frac),pattern=pattern)
                 allperiod[j,:,i] = period
                 allheight[j,:,i] = height
         else:
             for i,dc in enumerate(dc_in):
-                (dist,height,period,zero_std) = UnityInterfaceBrain.run_with_input(env,cpg,body_inds,bodytype,1,brain,outw,decay,outbias,t_arr,amp_arr[0],nframes,dc,0,seed=seed1,asym=None)
+                (dist,height,period,zero_std) = UnityInterfaceBrain.run_with_input(env,cpg,body_inds,bodytype,1,brain,outw,decay,outbias,t_arr,amp_arr[0],nframes,dc,0,seed=seed1,asym=asym,pattern=pattern)
                 allperiod[j,:,i] = period
                 allheight[j,:,i] = height
         
@@ -211,27 +211,52 @@ if __name__ == "__main__":
        
     
     n_processes = len(goodinpaths)
-    
+    asym_metre = 2
+
     if process == 1:
        amp_arr = np.arange(0.1,1.1,0.1)
        dc_arr = [0.5]
        t_arr = 1/np.arange(1,3.1,0.2) #1 to 3 Hz
-       asym_fracs = None
+       asym = None
+       pattern = None
        outprefix = '_impulse_'
     elif process == 2:
        amp_arr = [1.0]
        dc_arr = [0.5]
        t_arr = 1/np.arange(1,3.1,0.2) #1 to 3 Hz
-       asym_fracs = np.arange(0,0.95,0.1)
+       asym = (2,np.arange(0,0.95,0.1))
+       pattern = None
        outprefix = '_asym_'
     elif process == 3:
        amp_arr = [1.0]
        dc_arr = np.arange(0,1.05,0.1)
        t_arr = np.array([0.5,1.0])
-       asym_fracs = None
+       asym = None
+       pattern = None
        outprefix = '_iso120_'
-       
-    function = functools.partial(evalone,n_brain,n_cpg,n_body,bodytype,dc_arr,t_arr,amp_arr,asym_fracs,**kwargs)
+    elif process == 4:
+       amp_arr = np.arange(0.1,1.1,0.1)
+       dc_arr = [0.5]
+       t_arr = 1/np.arange(1,3.1,0.2) #1 to 3 Hz
+       asym = (3,0.5)
+       pattern = None
+       outprefix = '_ternary_'
+    elif process == 5:
+       amp_arr = np.arange(0.1,1.1,0.1)
+       dc_arr = [0.5]
+       t_arr = 1/np.arange(1,3.1,0.2) #1 to 3 Hz
+       asym = (4,0.5)
+       pattern = None
+       outprefix = '_quaternary_'
+    elif process == 6:
+       amp_arr = np.arange(0.1,1.1,0.1)
+       dc_arr = [0.5]
+       t_arr = 0.5/np.arange(1,3.1,0.2) #1 to 3 Hz
+       asym = None
+       pattern = [True,False,True,False,False,True,False,False]
+       outprefix = '_quaternary2_'       
+
+    function = functools.partial(evalone,n_brain,n_cpg,n_body,bodytype,dc_arr,t_arr,amp_arr,asym,pattern,**kwargs)
     workers = UnityInterfaceBrain.WorkerPool(function,unitypath,nb_workers=n_processes,port=port+(i%2)*n_processes,clargs = ['-bodytype',bodytype])
 
     alloutput = evalall(inds,workers)
@@ -252,7 +277,7 @@ if __name__ == "__main__":
         with open(outpath,'w') as outfile:
             outfile.writelines('period ratios:' + str(t_arr)+'\n')
             outfile.writelines('amplitude:' + str(amp_arr)+'\n')
-            outfile.writelines('asymmetry:' + str(asym_fracs)+'\n')
+            outfile.writelines('asymmetry:' + str(asym)+'\n')
             outfile.writelines('dc:' + str(dc_arr)+'\n')
         for jj,name in enumerate(outnames):
            outpath = path.replace(datadir,outdir).replace(suff,outprefix+name)
