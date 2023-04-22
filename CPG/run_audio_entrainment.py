@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Runs best brain for each CPG with audio clips, gets entrainment scores
+Runs all final brain populations several times and gets separate scores for height and entrainment
 Uses multiprocessing
-Usage: run_audio_entrainment.py [bodytype]
+Usage: python final_eval_unitybrain.py [n_cpu] [bodytype]
 
 @author: alexansz
 """
@@ -62,7 +62,7 @@ def evalone(n_brain,n_cpg,n_body,bodytype,dc_in,env,ind,numiter=5,nframes=1600,s
             
             
         
-    return (np.median(allperiod),np.median(allheight),np.median(allcorr))    
+    return (np.median(allperiod),np.median(allheight),np.median(allcorr),np.min(allperiod),np.max(allperiod))    
 
 
 def evalall(pop,workers):
@@ -204,6 +204,8 @@ if __name__ == "__main__":
     allperiod = np.zeros([n_clips,len(goodinpaths),len(dc_arr)])
     allheight = np.zeros([n_clips,len(goodinpaths),len(dc_arr)])
     allcorr = np.zeros([n_clips,len(goodinpaths),len(dc_arr)])
+    allminperiod = np.zeros([n_clips,len(goodinpaths),len(dc_arr)])
+    allmaxperiod = np.zeros([n_clips,len(goodinpaths),len(dc_arr)])
     
     
     n_processes = 10 #len(goodinpaths)
@@ -221,15 +223,21 @@ if __name__ == "__main__":
            currperiod = []
            currheight = []
            currcorr = []
+           currmin = []
+           currmax = []
 
            for fitness in fitnesses:
               currperiod.append(fitness[0])
               currheight.append(fitness[1])
               currcorr.append(fitness[2])
+              currmin.append(fitness[3])
+              currmax.append(fitness[4])
         
            allperiod[k,:,i] = currperiod
            allheight[k,:,i] = currheight
            allcorr[k,:,i] = currcorr
+           allminperiod[k,:,i] = currmin
+           allmaxperiod[k,:,i] = currmax
 
            #close down workers
            for ii in range(n_processes):
@@ -240,8 +248,8 @@ if __name__ == "__main__":
            time.sleep(5)
     
         
-    alloutput = (np.squeeze(allperiod),np.squeeze(allheight),np.squeeze(allcorr))
-    outnames = ['period','height','corr']
+    alloutput = (np.squeeze(allperiod),np.squeeze(allheight),np.squeeze(allcorr),np.squeeze(allminperiod),np.squeeze(allmaxperiod))
+    outnames = ['period','height','corr','minperiod','maxperiod']
     
     #export data
     for kk,path in enumerate(goodinpaths):
