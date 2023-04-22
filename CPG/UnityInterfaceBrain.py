@@ -729,7 +729,7 @@ def run_from_array(n, bodytype, env, p, dc=[1,0.5,0.5,1], tilt=[-0.015,0.015,0.0
     return tuple(fitout)
 
 
-def run_with_input(env,cpg,body_inds,bodytype,baseperiod,brain,outw,decay,outbias,t_arr,amp,nframes,dc,tilt,graphics=False,skipevery=-1,sdev=0,tstart=0,tend=1,timeseries=False,seed=None,asym=None,**kwargs):
+def run_with_input(env,cpg,body_inds,bodytype,baseperiod,brain,outw,decay,outbias,t_arr,amp,nframes,dc,tilt,graphics=False,skipevery=-1,sdev=0,tstart=0,tend=1,timeseries=False,seed=None,asym=None,pattern=None,**kwargs):
     #assumes baseperiod is in simulation seconds
     
     alldist = []
@@ -780,7 +780,7 @@ def run_with_input(env,cpg,body_inds,bodytype,baseperiod,brain,outw,decay,outbia
             seed3 = seed+3*i+2
 
         
-        z = 100*amp*roborun.periodinput(t*tcon*baseperiod,int(tt*tstart),int(tt*tend),tt,dt,skipevery=skipevery,sdev=sdev,seed=seed3,asym=asym)
+        z = 100*amp*roborun.periodinput(t*tcon*baseperiod,int(tt*tstart),int(tt*tend),tt,dt,skipevery=skipevery,sdev=sdev,seed=seed3,asym=asym,pattern=pattern)
         z = roborun.rc_lpf(z,decay*dt)
         maxperiod = max_r*t*tcon*baseperiod/2
 
