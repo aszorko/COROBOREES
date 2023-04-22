@@ -13,6 +13,7 @@ import os
 import pandas as pd
 import statsmodels.api as sm
 import statsmodels.formula.api as smf
+from scipy.stats import mannwhitneyu
 
 def getdata(filebase,run,cpg,prefix,measures):
     
@@ -38,8 +39,14 @@ def getdata(filebase,run,cpg,prefix,measures):
                 line = f.readline()
                 if len(line)==0:
                     break
-                splitline = line.split(',')                    
-                dataline = [float(x) for x in splitline]
+                splitline = line.split(',')                 
+                dataline = [float(x) for x in splitline if x != '']
+                if len(data)>0 and len(dataline)<len(data[0]):
+                   line= f.readline()
+                   if len(line)==0:
+                      break
+                   splitline = line.split(',')                    
+                   dataline = dataline+[float(x) for x in splitline]
                 data.append(dataline)
         measurearr.append(data)         
     
@@ -49,7 +56,7 @@ def getdata(filebase,run,cpg,prefix,measures):
 
 def plot_complexity(directory,filebase,run,cpg,bpms,plot):
     
-    measurearr,baseperiod,score = getdata(directory+filebase,run,cpg,'_audio2_',['corr','period','height'])
+    measurearr,baseperiod,score = getdata(directory+filebase,run,cpg,'_audio2_',['corr','period','height','minperiod','maxperiod'])
     
     t0 = 0.5 #0.5 seconds in real time = 120bpm
     t1 = 0.0075 #single CPG timestep correction
@@ -60,15 +67,36 @@ def plot_complexity(directory,filebase,run,cpg,bpms,plot):
     t_arr = np.array(measurearr[1])
     period = (t_arr[0,:]+t1)*0.5/t0
 
+    mint_arr = np.array(measurearr[3])
+    maxt_arr = np.array(measurearr[4])
+
+    #no input
     r0 = np.log2((t_arr[0,:]+t1)/t0)
     pscore0 = 1/(1+abs(np.round(r0) - r0)/tdiff_epsilon)
     inds = np.logical_or(r0 < min_r,r0 > max_r)
     pscore0[inds] = 0
     
+    #audio input, median period
     r = np.array([np.log2((t_arr[i+1,:]+t1)*bpms[i]/60) for i in range(len(bpms))])
     pscore = 1/(1+abs(np.round(r) - r)/tdiff_epsilon)
     inds = np.logical_or(r < min_r,r > max_r)
     pscore[inds] = 0
+
+    #audio input, min period
+    r_mint = np.array([np.log2((mint_arr[i+1,:]+t1)*bpms[i]/60) for i in range(len(bpms))])
+    mint_score = 1/(1+abs(np.round(r_mint) - r_mint)/tdiff_epsilon)
+    inds = np.logical_or(r_mint < min_r,r_mint > max_r)
+    mint_score[inds] = 0
+
+    #audio input, max period
+    r_maxt = np.array([np.log2((maxt_arr[i+1,:]+t1)*bpms[i]/60) for i in range(len(bpms))])
+    maxt_score = 1/(1+abs(np.round(r_maxt) - r_maxt)/tdiff_epsilon)
+    inds = np.logical_or(r_maxt < min_r,r_maxt > max_r)
+    maxt_score[inds] = 0
+
+    minscore = np.min([mint_score,pscore,maxt_score],axis=0)
+    maxscore = np.max([mint_score,pscore,maxt_score],axis=0)
+    
     
     dc = np.arange(0,1.1,0.1)
     
@@ -117,14 +145,14 @@ def plot_complexity(directory,filebase,run,cpg,bpms,plot):
     t_arr = np.array(measurearr[0])
     period = (t_arr[0,:]+t1)*0.5/t0
 
-    r1 = np.log2((t_arr[0,:]+t1)/t0)
+    r1 = np.log2((t_arr[0,:]+t1)/t0) #isochronous input
     pscore1 = 1/(1+abs(np.round(r1) - r1)/tdiff_epsilon)
     inds = np.logical_or(r1 < min_r,r1 > max_r)
     pscore1[inds] = 0
 
     
 
-    return fig,np.mean(pscore>(1+pscore0)/2),np.mean(pscore0),np.mean(pscore1),np.mean(pscore,axis=1)
+    return fig,np.mean(pscore>(1+pscore0)/2),np.mean(pscore0),np.mean(pscore1),np.mean(pscore,axis=1),np.mean((maxscore-minscore)/2,axis=1)
 
 
 def plot_flexibility(directory,filebase,run,cpg,plot,title=True):
@@ -206,13 +234,93 @@ def plot_flexibility(directory,filebase,run,cpg,plot,title=True):
     return fig,amp1score 
 
 
+def plot_rhythm(directory,filebase,run,cpg,plot,title=True):
+    
+    t1 = 0.0075 #single CPG timestep correction
+    max_r = 2.5
+    min_r = -1.5
+    tdiff_epsilon = 0.1 
+    
+    bpm = 60*np.arange(1,3.1,0.2)
+    t0 = 60/bpm
+
+    minbpm = bpm[0] - (bpm[1]-bpm[0])/2
+    maxbpm = bpm[-1] + (bpm[1]-bpm[0])/2
+
+    measurearr,baseperiod,score = getdata(directory+filebase,run,cpg,'_ternary_',['period','height'])
+      
+    y = np.arange(0,1.01,0.1)
+
+    miny = y[0] - (y[1]-y[0])/2
+    maxy = y[-1] + (y[1]-y[0])/2
+
+    r0 = np.log2(baseperiod/t0)
+    pscore0 = 1/(1+abs(np.round(r0) - r0)/tdiff_epsilon)
+    
+    r = np.log2(np.array([(np.array(measurearr[0][i])+t1)/t0[i] for i in range(len(t0))]).T)
+    pscore = 1/(1+abs(np.round(r) - r)/tdiff_epsilon)
+    inds = np.logical_or(r < min_r,r > max_r)
+    pscore[inds] = 0
+        
+    amp1score1 = np.mean(pscore[-1])
+    
+    if plot:
+        fig = plt.figure(figsize=(3,4))
+        gs = fig.add_gridspec(2, 1, left=0.2, right=0.7, bottom=0.1, top=0.9, wspace=0.05, hspace=0.15)
+    
+        ax2 = fig.add_subplot(gs[1, 0])    
+        im = ax2.imshow(np.concatenate([np.array([pscore0]),pscore],axis=0),vmin=0,vmax=1,extent=(minbpm,maxbpm,miny,maxy),aspect='auto',origin='lower')
+
+        ax2.set_ylabel('Amplitude')
+        ax2.grid(False)    
+        ax2.set_xlabel('BPM')
+        ax2.set_xticks([60,120,180])
+        
+        ax3 = fig.add_axes([0.75, 0.15, 0.05, 0.7])  
+        fig.colorbar(im,cax=ax3,label='Score')
+        
+        textkw = {'fontdict':{'fontsize':16}}
+        plt.gcf().text(0, 0.87,'A',**textkw)
+        plt.gcf().text(0, 0.45,'B',**textkw)
+        
+    else:
+        fig = None
+
+
+    measurearr,baseperiod,score = getdata(directory+filebase,run,cpg,'_quaternary2_',['period','height'])
+
+
+    miny = y[0] - (y[1]-y[0])/2
+    maxy = y[-1] + (y[1]-y[0])/2
+
+    
+    r = np.log2(np.array([(np.array(measurearr[0][i])+t1)/t0[i] for i in range(len(t0))]).T)
+    pscore = 1/(1+abs(np.round(r) - r)/tdiff_epsilon)
+    inds = np.logical_or(r < min_r, r > max_r)
+    pscore[inds] = 0
+
+    amp1score2 = np.mean(pscore[-1])
+    if plot:
+        ax3 = fig.add_subplot(gs[0, 0], sharex=ax2)    
+        ax3.imshow(pscore,vmin=0,vmax=1,extent=(minbpm,maxbpm,miny,maxy),aspect='auto',origin='lower')
+        plt.setp(ax3.get_xticklabels(), visible=False)
+        ax3.set_ylabel('Amplitude')
+        ax3.grid(False) 
+        if title:
+           ax3.set_title('run ' + str(run) + ' cpg ' + str(cpg))
+    
+
+    
+    return fig,amp1score1,amp1score2 
+
+
 if __name__ == '__main__':
     directory = r'./paper3_data/'
     
     #fig1: entrainment vs entropy
     #fig2: heatmaps for specified CPGs
         
-    figs = [1,2]
+    figs = [1]
     plotall = False #for all heatmaps
     
     sampledf = pd.read_csv('clipmeasures.txt')
@@ -223,10 +331,11 @@ if __name__ == '__main__':
         filebase = 'unityshort'
         files = os.listdir(directory)
         scores1 = []
-        scores2 = []
         allscores = []
+        allrange = []
         allnullscores = []
         allisoscores = []
+        all
         
         cpgs = sum([[(run,cpg) for cpg in range(1,5)] for run in range(1,6)],[])
         for curr in cpgs:
@@ -235,10 +344,10 @@ if __name__ == '__main__':
             if not filebase + '_run' + str(run) + '_brain' + str(cpg) + '_audio2_info.txt' in files:
                 continue
             _,medscore = plot_flexibility(directory,filebase,run,cpg,plotall)
-            _,medscore2,null_score,isoscore,scorepersample  = plot_complexity(directory,filebase,run,cpg,bpms,plotall)
+            _,_,null_score,isoscore,scorepersample,scorerange  = plot_complexity(directory,filebase,run,cpg,bpms,plotall)
             scores1.append(medscore)
-            scores2.append(medscore2)
             allscores.append(scorepersample)
+            allrange.append(scorerange)
             allnullscores.append(null_score)
             allisoscores.append(isoscore)
         
@@ -248,13 +357,15 @@ if __name__ == '__main__':
         
         textkw = {'fontdict':{'fontsize':16}}
         fig1 = plt.figure()
-        plt.plot(sampledf.PulseEnt[sampleorder],np.array(allscores)[inds,:].T,'.b')
+        for i in np.where(inds)[0]:
+           plt.errorbar(sampledf.PulseEnt[sampleorder],allscores[i],yerr=allrange[i],ecolor='silver',marker='.',ls='',c='blue',capsize=2)
         plt.plot([x1 for i in range(sum(inds))],np.array(allisoscores)[inds],'.k')
         plt.plot([x2 for i in range(sum(inds))],np.array(allnullscores)[inds],'.k')
         plt.plot([0.46,0.46],[0,1],'--k')
         plt.xlabel('            Entropy Autocor.',**textkw)
         plt.ylabel('Entrainment Score',**textkw)
         plt.xticks([x1,x2,0.5,0.6,0.7,0.8],['Iso.','None','0.5','0.6','0.7','0.8'])
+        plt.ylim([-0.05,1.05])
             
         scorearr = np.array(allscores)[inds,:].flatten()
         entarr = np.array([sampledf.PulseEnt[sampleorder] for i in range(sum(inds))]).flatten()
@@ -291,4 +402,28 @@ if __name__ == '__main__':
             fig2,medscore = plot_flexibility(directory,filebase,run,cpg,True,title=False)
             _ = plot_complexity(directory,filebase,run,cpg,bpms,True)
         
-            
+    if 3 in figs:
+        #cpgs = [('unityshort',4,3)]
+        cpgs = sum([[('unityshort',run,cpg) for cpg in range(1,5)] for run in range(1,6)],[])
+        files = os.listdir(directory)
+        all3time = []
+        all4time = []
+        for curr in cpgs:
+            filebase = curr[0]
+            run = curr[1]
+            cpg = curr[2]
+            if not filebase + '_run' + str(run) + '_brain' + str(cpg) + '_audio2_info.txt' in files:
+                continue
+
+            _,medscore1,medscore2 = plot_rhythm(directory,filebase,run,cpg,False,title=True)
+            print(run,cpg,medscore1,medscore2)
+            all3time.append(medscore1)
+            all4time.append(medscore2)
+        fig3 = plt.figure(figsize=(4,4))
+        plt.scatter(all3time,all4time)
+        plt.plot([-1,1],[-1,1],'grey')
+        plt.xlim([-0.05,0.65])
+        plt.ylim([-0.05,0.65])
+        plt.xlabel('3/4 score')
+        plt.ylabel('4/4 score')
+        mannwhitneyu(all3time,all4time)
