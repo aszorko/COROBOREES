@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Runs all final brain populations several times and gets separate scores for height and entrainment
+Runs CPG+brain combinations with audio stimuli stored in the Unity executable
 Uses multiprocessing
-Usage: python final_eval_unitybrain.py [n_cpu] [bodytype]
+Usage: python run_audio_entrainment.py [bodytype]
 
 @author: alexansz
 """
