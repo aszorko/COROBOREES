@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Runs all final brain populations several times and gets separate scores for height and entrainment
+Runs CPG+brain combinations with impulse-based stimuli
 Uses multiprocessing
-Usage: python final_eval_unitybrain.py [n_cpu] [bodytype]
+Usage: python run_impulse_entrainment.py [bodytype] [process #]
 
 @author: alexansz
 """
