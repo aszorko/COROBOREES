@@ -25,3 +25,9 @@ https://arxiv.org/abs/2210.08102
 ## Paper3: Embodied tempo tracking with a virtual quadruped
 
 This is a Python+Unity implementation. Short-legged quadruped agents from Paper2 are tested with a wide range of pulse inputs and musical excerpts.
+
+To appear in Proceedings of the Sound and Music Conference 2023
+
+## Paper4: From real-time adaptation to social learning in robot ecosystems
+
+This is a Python+Unity implementation. Short-legged quadruped agents from Paper2 and newly evolved hexapods are run in teacher-learner pairs. A quasi-Hebbian process is used to turn synchronized gaits into autonomous gaits.
