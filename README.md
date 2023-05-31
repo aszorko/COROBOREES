@@ -6,9 +6,8 @@
 
 ## Evaluation
 
-The evaluation script uses multiprocessing and are run from the command line in the virtual environment (e.g. via Slurm, see master branch for info). No arguments needed.
+The evaluation script `CPG/run_hebb.py` uses multiprocessing and is run from the command line in the virtual environment (e.g. via Slurm, see master branch for info). No arguments needed.
 
-`CPG/run_hebb.py`:
 
 ## Data
 
