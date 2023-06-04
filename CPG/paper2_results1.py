@@ -138,6 +138,7 @@ def braindata(file2base,plotmeasures,cpglist=[],plot=False,labels=[],titles=True
     brainscores = []
     brainheights = []
     allfigs = []
+    allcpgs = []
     minheight = 0.75
     mpl.style.use('default')
     textkw = {'fontdict':{'fontsize':16}}
@@ -159,8 +160,16 @@ def braindata(file2base,plotmeasures,cpglist=[],plot=False,labels=[],titles=True
                 continue
 
             brainfile = file2base + str(run) + '_brain' + str(cpg) + '.txt'
+
+            f = open(brainfile,'r')
+            line = f.readline()
+            cpgarr = line.split(':')[1].replace('[','').replace(']','').split(',')
+            f.close()
+            allcpgs.append([int(x) for x in cpgarr])
+
             evodata,_,_ = evoplot.main(brainfile,[11,12,13])
             allevodata.append(evodata)
+            
 
             i=0
             currscore = np.nan
@@ -256,12 +265,12 @@ def braindata(file2base,plotmeasures,cpglist=[],plot=False,labels=[],titles=True
     #df = pd.DataFrame(data=np.array([brainscores,brainheights,np.sqrt(np.array(alldy)),np.sqrt(np.array(alldz)),allz,allheight,allind]).T,columns=["brainscore","brainheight","diffperiod","diffcorr","corrmax","height","corrind"])
     df = pd.DataFrame(data=np.array([brainscores,brainheights,alldy,alldz,allz,allheight,allind]).T,columns=["brainscore","brainheight","diffperiod","diffcorr","corrmax","height","corrind"])
     df.corrind[df.corrmax<0.3] = 0
-    return df, np.array(allevodata), allbrains, allfigs
+    return df, np.array(allevodata), allbrains, allcpgs, allfigs
 
 if __name__ == "__main__":
     
     #1: plot CPG scatter plots, 2: CPG stats, 3: CPG heat plots, 4: brain stats, 5: brain evolution, 6: get best CPG, 7: CPG evolution, 8: control parameters figure
-    runmode = [4]
+    runmode = [2]
 
     mpl.style.use('default')
     textkw = {'fontsize':16}
@@ -408,11 +417,12 @@ if __name__ == "__main__":
        else:
            heatplot = False
        
-       df1,ev1,brains1,figs1 = braindata(file2base,measures,cpglist=normalplots,plot=heatplot,labels=['A']) 
+       df1,ev1,brains1,cpgs1,figs1 = braindata(file2base,measures,cpglist=normalplots,plot=heatplot,labels=['A']) 
        df1["short"] = 0
-       df2,ev2,brains2,figs2 = braindata(file2base_short,measures,cpglist=shortplots,plot=heatplot,labels=['B'],titles=False) 
+       df2,ev2,brains2,cpgs2,figs2 = braindata(file2base_short,measures,cpglist=shortplots,plot=heatplot,labels=['B'],titles=False) 
        df2["short"] = 1
        braindf = pd.concat([df1,df2])
+       cpgs1.extend(cpgs2)
     
     if 4 in runmode:
         
@@ -517,7 +527,7 @@ if __name__ == "__main__":
        
        t = [0,10,12,20,30]
        br = [1,0.5,0.5,0.5,1]
-       tilt = [-0.016,-0.016,0.016,0.016,0.016]
+       tilt = [-1.44,-1.44,1.44,1.44,1.44]
        fig8 = plt.figure()
        mpl.style.use('default')
        gs = fig8.add_gridspec(3,1, hspace=0.25,wspace=0.25)
@@ -528,9 +538,9 @@ if __name__ == "__main__":
        axs[1].set_yticks([0.5,1])
        axs[1].set_xlim([0,30])
        axs[2].plot(t,tilt)
-       axs[2].set_ylabel(r"$\theta_C$",**textkw)
+       axs[2].set_ylabel(r"$\theta_C$ (deg)",**textkw)
        axs[2].set_xlabel("Time (s)",**textkw)
-       axs[2].set_yticks([-0.016,0,0.016])
+       axs[2].set_yticks([-1.44,0,1.44])
        axs[2].set_xlim([0,30])
        axs[0].set_ylim([-1,1])
        axs[0].set_xlim([0,30])
@@ -540,9 +550,10 @@ if __name__ == "__main__":
        axs[0].annotate(text='', xy=(10,-0.9), xytext=(0,-0.9), arrowprops=dict(arrowstyle='<->', color='k', lw=1, shrinkA=0, shrinkB=0))
        axs[0].annotate(text='', xy=(20,-0.9), xytext=(10,-0.9), arrowprops=dict(arrowstyle='<->', color='k', lw=1, shrinkA=0, shrinkB=0))
        axs[0].annotate(text='', xy=(30,-0.9), xytext=(20,-0.9), arrowprops=dict(arrowstyle='<->', color='k', lw=1, shrinkA=0, shrinkB=0))
-       axs[0].text(2,-0.8,'$F_1$ (backwards)')
-       axs[0].text(12.5,-0.8,'$F_2$ (forwards)')
-       axs[0].text(21.5,-0.8,'$F_3$ (accelerating)')
+       axs[0].text(2,-0.8,'$F_1$ (back. fast)')
+       axs[0].text(11.5,-0.8,'$F_2$ (forw. steady)')
+       axs[0].text(21.5,-0.8,'$F_3$ (forw. fast)')
        axs[0].text(12.5,-0.2,'$F_4$ (upright)')
        axs[0].axis('off')
+       plt.tight_layout()
   

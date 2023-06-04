@@ -14,6 +14,18 @@ import matplotlib as mpl
 from matplotlib import pyplot as plt
 from scipy import signal
 
+def convolve(sig,period,dt):
+    wt = np.arange(-0.5,0.5,dt)
+    gamma = 0.667 #0.5
+    wavelet = (np.cos(2*np.pi*wt/period) - np.exp(-0.5/gamma**2))*np.exp(-0.5*(wt*gamma/period)**2)
+    out = signal.convolve(sig,wavelet,mode='same',method='direct')/sum(wavelet**2)
+    
+    wind = 2
+    gamma2 = 2
+    y = np.exp(-0.5*gamma2**2*np.arange(-wind,wind,dt)**2)
+    
+    return np.convolve(out**2, y, 'same')
+
 
 if __name__ == "__main__":
     mpl.style.use('ggplot')
@@ -23,8 +35,8 @@ if __name__ == "__main__":
     baseperiod = 8.16 #cpg units
     
     t_arr = [0.8,1.25]
-    
-    
+    t_ratios = [1.5,1]
+    legtext = ['Stimulus T x 3/2','Stimulus T']
 
     
     n_brain = 6
@@ -33,8 +45,8 @@ if __name__ == "__main__":
     
     dt = 0.16
     dt_unity = 0.1
-    stepsperframe = 12
-    t_length = 20 #seconds
+    stepsperframe = 13 #12
+    t_length = 22 #seconds
     nframes = int(t_length / dt_unity)
     stimstart = 6 #seconds
     stimend = 16 #seconds
@@ -71,36 +83,52 @@ if __name__ == "__main__":
 
         
         outpks = []
+        outsync0 = []
+        outsync1 = []
         inpks,_ = signal.find_peaks(allinput[i],height=0.01)
         for k in range(4):
             alloutput[i][k,:] = limbamp[k]*alloutput[i][k,:]
             times,_ = signal.find_peaks(np.diff(np.real(alloutput[i][k,:])),height=0.05,prominence=0.1)
             outpks.append(times)
-    
-        fig, axs = plt.subplots(4,1)
+            sync0 = convolve(np.diff(np.real(alloutput[i][k,:])),baseperiod,dt_unity/stepsperframe)
+            sync1 = convolve(np.diff(np.real(alloutput[i][k,:])),t_ratios[j]*t_arr[j]*baseperiod,dt_unity/stepsperframe)            
+            outsync0.append(sync0)
+            outsync1.append(sync1)
+            
+        fig, axs = plt.subplots(5,1)
         for k in range(4):
            axs[0].plot(t0[outpks[k]],k+0*t0[outpks[k]],'|')
         axs[0].plot(t0[inpks],4+0*t0[inpks],'|k')
-        axs[0].set_xlim([2,t_length])
+        axs[0].set_xlim([2,t_length-2])
         axs[0].set_xticks([])
         axs[0].set_yticks([0,1,2,3,4])
         #axs[0].set_yticklabels(['RH','LF','RF','LH','Stim'])    
         axs[0].set_yticklabels(['LH','RH','LF','RF','Stim'])    
         axs[0].set_ylim([-1,5])
         axs[1].plot(t0[1:],2*stepsperframe*UnityInterfaceBrain.sig(2*legamp*np.diff(np.real(alloutput[i]))).squeeze().T)
-        axs[1].set_xlim([2,t_length])
-        axs[1].set_xticks([])    
+        axs[1].set_xlim([2,t_length-2])
+        axs[1].set_xticks([]) 
+        axs[1].set_yticks([0,0.2])         
         axs[1].set_ylabel('Leg output')
-        axs[2].plot(t1,allheight[i])
-        axs[2].set_xlim([2,t_length])
-        axs[2].set_xticks([])    
-        axs[2].set_ylabel('Height')#,labelpad=20)
-        axs[3].plot(t1,alltilt[i])
-        axs[3].set_xlim([2,t_length])
-        axs[3].set_ylabel('Tilt')#,labelpad=17)
-        axs[3].set_xlabel('Time (s)')
+        y1 = np.max(np.array(outsync1),0)
+        y0 = np.max(np.array(outsync0),0)
+        line1, = axs[2].plot(t0[1:],y1/np.max(y1))
+        line2, = axs[2].plot(t0[1:],y0/np.max(y0))
+        axs[2].set_xlim([2,t_length-2])
+        axs[2].set_xticklabels([])
+        axs[2].tick_params(axis='x', color='white')    
+        axs[2].set_ylabel('Sync')
+        axs[2].legend([line1,line2],['Intrinsic T',legtext[j]],fontsize=8,loc='lower left')
+        axs[3].plot(t1,allheight[i])
+        axs[3].set_xlim([2,t_length-2])
+        axs[3].set_xticks([])    
+        axs[3].set_ylabel('Height')#,labelpad=20)
+        axs[4].plot(t1,alltilt[i])
+        axs[4].set_xlim([2,t_length-2])
+        axs[4].set_ylabel('Tilt')#,labelpad=17)
+        axs[4].set_xlabel('Time (s)')
         plt.gcf().text(0.01, 0.85,figlabels[j],**textkw)
         plt.show()
-        fig.savefig('paper2_figures/timeseries_v2' + figlabels[j] + '.eps')
+        fig.savefig('paper2_figures/timeseries_v3' + figlabels[j] + '.eps')
     
     env.close()
