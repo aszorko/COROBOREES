@@ -10,23 +10,25 @@ Clone the repository. To enable the Unity simulations (currently Linux only), cr
 
 This is a Python-only implementation that evolves disembodied CPGs directly for flexible periods. Filters are evolved for period matching.
 
-https://arxiv.org/abs/2206.01638
+Preprint: https://arxiv.org/abs/2206.01638
 
-Appears in Proceedings of the IEEE International Joint Conference on Neural Networks 2022
+Szorkovszky, A., Veenstra, F., and Glette, K. (2022) in *2022 International Joint Conference on Neural Networks (IJCNN)*
 
-## Paper2: Central pattern generators evolved for real-time adaptation
+## Paper2: Central pattern generators evolved for real-time adaptation to rhythmic stimuli
 
 This is a Python+Unity implementation. CPGs are evolved for stable backwards+forward+accelerating motion as control parameters are swept. Filters are evolved for period matching.
 
-https://arxiv.org/abs/2210.08102
+Szorkovszky A., Veenstra F. and Glette K. (2023) *Bioinspiration and Biomimetics* 
 
-*(submitted)*
+https://doi.org/10.1088/1748-3190/ace017
 
 ## Paper3: Embodied tempo tracking with a virtual quadruped
 
 This is a Python+Unity implementation. Short-legged quadruped agents from Paper2 are tested with a wide range of pulse inputs and musical excerpts.
 
-To appear in Proceedings of the Sound and Music Conference 2023
+Szorkovszky A., Veenstra F. and Glette K. (2023), in *Proceedings of the Sound and Music Conference 2023*, pp 283-288
+
+https://smcsweden.se/proceedings/SMC2023_proceedings.pdf
 
 ## Paper4: From real-time adaptation to social learning in robot ecosystems
 
