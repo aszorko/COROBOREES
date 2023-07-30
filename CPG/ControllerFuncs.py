@@ -10,12 +10,15 @@ import math
 from MathUtils import sig,hinge
 
 class Controller:
-    def __init__(self,body,cpg,brain,outw,outbias):
+    def __init__(self,body,cpg,brain,outw,decay,outbias,bodytype):
         self.body = body
         self.cpg = cpg
         self.brain = brain
         self.outw = outw
+        self.decay = decay
         self.outbias = outbias
+        self.bodytype = bodytype
+        self.prevobs = None
 
     def getobs(self,obs):
         
@@ -28,11 +31,31 @@ class Controller:
         pardist = obs[2]
         perpdist = obs[0]
         
-        orient = math.atan2(obs[6], obs[8]) 
+        orient = math.atan2(obs[6], obs[8])
+            
+        if self.prevobs is not None:
+            d_rot = self.prevobs[8]*obs[6]-self.prevobs[6]*obs[8]/np.sqrt(self.prevobs[8]**2+self.prevobs[6]**2)/np.sqrt(obs[8]**2+obs[6]**2)
+            heading = math.atan2(obs[0]-self.prevobs[0], obs[2]-self.prevobs[2])
+            currspeed = np.sqrt((obs[2] - self.prevobs[2])**2 + (obs[0] - self.prevobs[0])**2)
+            parspeed = currspeed*math.cos(orient-heading)   
+        else:
+            d_rot = 0
+            parspeed = np.nan
+            
+            
+        if len(obs)>9:
+           contacts = obs[9:]
+           #for i,c in enumerate(contacts):
+           #    if c>0:
+           #        print('contact foot',i)
+        else:
+           contacts = None
+
+        self.prevobs = obs
         
-        return pardist,perpdist,currheight,sidetilt,fronttilt,tot_tilt,orient
+        return pardist,perpdist,currheight,sidetilt,fronttilt,tot_tilt,orient,contacts,parspeed,d_rot
     
-    def getactions(self,pos_diff,tilt_control,num_joints):
+    def getactions(self,pos_diff,tilt_control,num_joints,outamp=1.0):
         #assumes three joints per limb. num_joints is total array size (padded with zeros)
         
         k = len(self.body.limblist)
@@ -52,9 +75,9 @@ class Controller:
     
         action = np.array([0.0 for i in range(num_joints)])
         
-        action[:k] = self.body.limbdir[0]*(2*self.body.anglimit[0]*sig(2*leg_angs/self.body.anglimit[0]) + self.body.leg_zero + tilt_out*self.body.tiltlimb[0])
-        action[k:2*k] = self.body.limbdir[1]*(2*self.body.anglimit[1]*sig(2*knee_angs/self.body.anglimit[1]) + self.body.knee_zero + tilt_out*self.body.tiltlimb[1])
-        action[2*k:3*k] = self.body.limbdir[2]*(2*self.body.anglimit[2]*sig(2*hip_angs/self.body.anglimit[2]) + self.body.hip_zero + tilt_out*self.body.tiltlimb[2]) # + hip_fb
+        action[:k] = outamp*self.body.limbdir[0]*(2*self.body.anglimit[0]*sig(2*leg_angs/self.body.anglimit[0]) + self.body.leg_zero + tilt_out*self.body.tiltlimb[0])
+        action[k:2*k] = outamp*self.body.limbdir[1]*(2*self.body.anglimit[1]*sig(2*knee_angs/self.body.anglimit[1]) + self.body.knee_zero + tilt_out*self.body.tiltlimb[1])
+        action[2*k:3*k] = outamp*self.body.limbdir[2]*(2*self.body.anglimit[2]*sig(2*hip_angs/self.body.anglimit[2]) + self.body.hip_zero + tilt_out*self.body.tiltlimb[2]) # + hip_fb
         
         return action
     
