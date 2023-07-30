@@ -183,13 +183,7 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
     else:
         body = SimBodies.QuadBody(bodytype,pint)
 
-
-    body.B_front_fb_amp = 0
-    body.A_front_fb_amp = 0
-    body.B_side_fb_amp = 0
-    body.A_side_fb_amp = 0
-
-
+    
     controller = ControllerFuncs.Controller(body,individual,brain,outw,decay,outbias,bodytype)
     
     if nframes < 0:
@@ -342,8 +336,7 @@ def evaluate(env, individual, pint, bodytype, dc_in=[0.5, 0.5], brain=None, brai
             
             ### get audio input 
             if sound and len(controlparams) > 0:
-                #audio_in = 20*controlparams[0][3]*min([j,audio_rampframes])/audio_rampframes
-                audio_in = 100*controlparams[0][3]*min([j,audio_rampframes])/audio_rampframes
+                audio_in = 20*controlparams[0][3]*min([j,audio_rampframes])/audio_rampframes
 
                 if debug:
                    allaudio.append(audio_in)
