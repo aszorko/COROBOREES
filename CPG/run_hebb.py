@@ -97,7 +97,7 @@ def runteacher(n_brain,n_cpg,n_body,bodytype,nframes,dc,tilt,env,ind):
     controller.cpg.reset(111)
     controller.brain.reset(222)
 
-    _,_,allx,allsensors,_,_,_,_ = hebb.run(env,controller,nframes,dc=dc,tilt=tilt)
+    _,_,allx,allsensors,_,_,_,_,_,_ = hebb.run(env,controller,nframes,dc=dc,tilt=tilt)
     
     period,_ = MathUtils.autocorr(allx,0.33,round(0.1/dt_unity),maxdelay=round(2.0/dt_unity))
     

@@ -39,7 +39,7 @@ def main(env,controller,bodytype,z_in,period_in,nframes,dc,tilt,seed=123,plot=Fa
 
     
     #no input
-    allbrainout,allintn,allcpgout,allsensors,zout,free_height,_,_ = run(env,controller,nframes,dc,tilt)
+    allbrainout,allintn,allcpgout,allsensors,zout,free_height,free_speed,free_rot,_,_ = run(env,controller,nframes,dc,tilt)
 
     zsens = MathUtils.lpf(np.sum(1+allsensors,axis=0),controller.decay*dt*stepsperframe)
     free_corr = crosscorr2(zsens,z,period_frames,start=corrstart)
@@ -52,7 +52,7 @@ def main(env,controller,bodytype,z_in,period_in,nframes,dc,tilt,seed=123,plot=Fa
     controller.brain.reset(seed+1)
                
 
-    allbrainout,allintn,allcpgout,allsensors,zout,sync_height,_,_ = run(env,controller,nframes_timelearn,dc,tilt,brain_in=z[:nframes_timelearn])
+    allbrainout,allintn,allcpgout,allsensors,zout,sync_height,sync_speed,sync_rot,_,_ = run(env,controller,nframes_timelearn,dc,tilt,brain_in=z[:nframes_timelearn])
 
     zsens2 = MathUtils.lpf(np.sum(1+allsensors,axis=0),controller.decay*dt*stepsperframe)
     sync_corr = crosscorr2(zsens2,z,period_frames,start=corrstart)
@@ -78,7 +78,7 @@ def main(env,controller,bodytype,z_in,period_in,nframes,dc,tilt,seed=123,plot=Fa
        print("Learning amplitudes:")    
 
     
-    allbrainout,allintn,allcpgout,allsensors,zout,_,amps_out,learnout = run(env,controller,nframes_amplearn,dc,tilt,brain_in=z[:nframes_amplearn],footfb = (delays,np.array(corrheights)*fbamp,1.0,n_thresh,zmean))
+    allbrainout,allintn,allcpgout,allsensors,zout,_,_,_,amps_out,learnout = run(env,controller,nframes_amplearn,dc,tilt,brain_in=z[:nframes_amplearn],footfb = (delays,np.array(corrheights)*fbamp,1.0,n_thresh,zmean))
 
 
     
@@ -104,13 +104,14 @@ def main(env,controller,bodytype,z_in,period_in,nframes,dc,tilt,seed=123,plot=Fa
     controller.cpg.reset(seed)
     controller.brain.reset(seed+1)
     
-    allbrainout,allintn,allcpgout,allsensors,zout,learn_height,_,learnout = run(env,controller,nframes_selfsync,dc,tilt,footfb = (delays,amps_out,1.0,n_thresh,zmean))
+    allbrainout,allintn,allcpgout,allsensors,zout,learn_height,learn_speed,learn_rot,_,learnout = run(env,controller,nframes_selfsync,dc,tilt,footfb = (delays,amps_out,1.0,n_thresh,zmean))
 
 
     zsens3 = MathUtils.lpf(np.sum(1+allsensors,axis=0),controller.decay*dt*stepsperframe)
     learn_corr = crosscorr2(zsens3,z,period_frames,start=corrstart)    
     learn_period,learn_autocorr = MathUtils.autocorr(allcpgout, corrstart, mindelay=round(0.1/dt_real))
-    
+    meanlearnspeed = np.mean(learn_speed[round(nframes_selfsync/2):])    
+    meanlearnrot = np.mean(learn_rot[round(nframes_selfsync/2):])    
     learnfree_corr = crosscorr2(zsens3,zsens,period_frames,start=corrstart)
     learnsync_corr = crosscorr2(zsens3,zsens2,period_frames,start=corrstart)
     fb_corr = crosscorr2(zout[::stepsperframe],z,period_frames,start=corrstart)
@@ -118,9 +119,11 @@ def main(env,controller,bodytype,z_in,period_in,nframes,dc,tilt,seed=123,plot=Fa
 
     if plot:
         print("Mean feedback:",np.mean(zout))
+        #threshold vs time
         plt.figure()
         plt.plot(learnout[3])
         plt.show()
+        #feedback signal and foot outputs
         wind = 5
         startframe = round(nframes_selfsync*0.8)
         fb_ma = np.convolve(zout[startframe*stepsperframe::stepsperframe],np.ones(wind)/wind,'same')
@@ -129,11 +132,40 @@ def main(env,controller,bodytype,z_in,period_in,nframes,dc,tilt,seed=123,plot=Fa
         #axs[1].plot(np.array([x+i*1.5 for i,x in enumerate(learnout[1])]).T)
         axs[1].plot(np.array([x[round(nframes_selfsync*0.8):]+i*1.5 for i,x in enumerate(learnout[2])]).T)
         plt.show()
+        """
+        fig, axs = plt.subplots(2,1)
+        startframe=round(nframes/2)
+        axs[0].plot(free_speed[startframe:])
+        axs[0].plot(sync_speed[startframe:])
+        axs[0].plot(learn_speed[startframe:])
+        axs[1].plot(np.cumsum(free_rot[startframe:]))
+        axs[1].plot(np.cumsum(sync_rot[startframe:]))
+        axs[1].plot(np.cumsum(learn_rot[startframe:]))
+        """
+        #analysis plots
         analysis(allbrainout,allintn,allsensors,zout[:stepsperframe*nframes_selfsync:stepsperframe],learn_period,m,dt_real,nframes_selfsync,stepsperframe,plot=True)
+        #all autocorrelations
         plotcorrs([z,zsens,zsens2,zsens3,zout[::stepsperframe]],period_frames,dt_real,['$z_T$','$x_F$','$x_S$','$x_L$','$z_L$'],'./allautocorrs.eps',start=corrstart)
+        #run once more with feedback turned on halfway. plot speed and rotation
+        _,_,_,_,_,_,learn_speed,learn_rot,_,_ = run(env,controller,2*nframes_selfsync,dc,tilt,footfb = (delays,amps_out,1.0,n_thresh,zmean),footfbstart=nframes_selfsync)
+        startframe = 100
+        fig, axs = plt.subplots(2,1)
+        t = np.arange(2*nframes_selfsync)*dt_real
+        if 'hex' in bodytype:
+            bodylength = 0.4
+        else:
+            bodylength = 1.0
+        axs[0].plot(t[startframe:],learn_speed[startframe:]/dt_real/bodylength)
+        axs[0].set_ylabel('Forward speed (BL/s)',fontsize=16)
+        axs[1].plot(t[startframe:],np.cumsum(learn_rot[startframe:]))
+        axs[1].set_xlabel('Time (s)',fontsize=16)
+        axs[1].set_ylabel('Direction (radians)',fontsize=16)
+        plt.gcf().text(0.03, 0.9,'B',fontsize=18)
+        plt.show()
+        fig.savefig('paper4_figures/switching.eps')
 
-    
-    return (zmean,free_height,dt_real*free_period,free_autocorr,free_corr,sync_height,dt_real*sync_period,sync_autocorr,sync_corr,syncfree_corr,learn_height,dt_real*learn_period,learn_autocorr,learn_corr,learnfree_corr,learnsync_corr,fb_corr,np.mean(zout))
+            
+    return (zmean,free_height,dt_real*free_period,free_autocorr,free_corr,sync_height,dt_real*sync_period,sync_autocorr,sync_corr,syncfree_corr,learn_height,dt_real*learn_period,learn_autocorr,learn_corr,learnfree_corr,learnsync_corr,fb_corr,np.mean(zout),meanlearnspeed,meanlearnrot)
 
 
 def analysis(allbrainout,allintn,allsensors,z,cpgperiod,m,dt_real,nframes,stepsperframe,plot=False):
@@ -297,7 +329,7 @@ def plotcorrs(allx,period,dt,legstrings,outfile,start=0):
 
 
 
-def run(env, controller, nframes, dc=0.5, tilt=0, sound=False,arousal=False,brain_in=None,footfb=None):
+def run(env, controller, nframes, dc=0.5, tilt=0, sound=False,arousal=False,brain_in=None,footfb=None,footfbstart=100):
 
 
     dt_real,dt_cpg,t0 = UnityInterfaceBrain.gettimestep(controller.bodytype,True)
@@ -316,6 +348,8 @@ def run(env, controller, nframes, dc=0.5, tilt=0, sound=False,arousal=False,brai
     allfootfb = np.zeros([1,stepsperframe*nframes])[0]
     allfbcount = np.zeros([1,nframes])[0]
     allheight = np.zeros([1,nframes])[0]
+    allspeed = np.zeros([1,nframes])[0]
+    allrot = np.zeros([1,nframes])[0]
     brain_filt = [0.0 for i in range(stepsperframe)]
     #diff = np.zeros([1,nframes])[0]
 
@@ -356,7 +390,7 @@ def run(env, controller, nframes, dc=0.5, tilt=0, sound=False,arousal=False,brai
     burnin = 1000
     ramptime = 50           # ramping of joint activation
     audio_rampframes = 100  # ramping of audio input
-    footfbstart = 100
+    
     
     currfootfb = 0
     curract = 0
@@ -378,9 +412,11 @@ def run(env, controller, nframes, dc=0.5, tilt=0, sound=False,arousal=False,brai
            controlparams = contsteps.obs[0]
        
        #get robot info from Unity
-       currpardist,currperpdist,currheight,sidetilt,fronttilt,currtilt,orient,sensors = controller.getobs(obs.obs[0][0])
+       currpardist,currperpdist,currheight,sidetilt,fronttilt,currtilt,orient,sensors,currspeed,currrot = controller.getobs(obs.obs[0][0])
        allsensors[:,t] = sensors[0:m]
        allheight[t] = currheight
+       allspeed[t] = currspeed
+       allrot[t] = currrot
        
        ### get audio input 
        if sound and len(controlparams) > 0:
@@ -484,7 +520,7 @@ def run(env, controller, nframes, dc=0.5, tilt=0, sound=False,arousal=False,brai
         footamps = None
         learnout = None
       
-    return allbrainout[controller.body.limblist],allintn[controller.body.limblist],allx,allsensors,zout,np.mean(allheight),footamps,learnout
+    return allbrainout[controller.body.limblist],allintn[controller.body.limblist],allx,allsensors,zout,np.mean(allheight),allspeed,allrot,footamps,learnout
    
 if __name__ == '__main__':
     main()
