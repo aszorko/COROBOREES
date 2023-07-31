@@ -1,6 +1,8 @@
 # From real-time adaptation to social learning in robot ecosystems
 
 
+[![Youtube: example of social learning in simulation](https://img.youtube.com/vi/rARNARMTKqo/0.jpg)](https://www.youtube.com/watch?v=rARNARMTKqo)
+
 
 ## Unity executables (coming soon)
 
@@ -14,7 +16,7 @@ The evaluation script `CPG/run_hebb.py` uses multiprocessing and is run from the
 Data is contained in the `CPG/paper4_data/` directory.
 
 `$python CPG/paper4_results1.py`
-will run analyses on these data and produce Figures 2,3,4,5b and statistics.
+will run analyses on these data and produce Figures 2,4,5,6b and statistics.
 
 `$python CPG/paper4_results2.py`
-generates Figure 5a using the Unity interface. Must be run from command line in the virtual environment.
+generates Figure 3 and Figure 5a using the Unity interface. Must be run from command line in the virtual environment.
