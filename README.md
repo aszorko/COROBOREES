@@ -19,4 +19,4 @@ Data is contained in the `CPG/paper4_data/` directory.
 will run analyses on these data and produce Figures 2,4,5,6b and statistics.
 
 `$python CPG/paper4_results2.py`
-generates Figure 3 and Figure 5a using the Unity interface. Must be run from command line in the virtual environment.
+generates Figure 3 and Figure 6a using the Unity interface. Must be run from command line in the virtual environment.
