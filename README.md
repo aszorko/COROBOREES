@@ -10,9 +10,9 @@ Clone the repository. To enable the Unity simulations (currently Linux only), cr
 
 This is a Python-only implementation that evolves disembodied CPGs directly for flexible periods. Filters are evolved for period matching.
 
-Preprint: https://arxiv.org/abs/2206.01638
-
 Szorkovszky A, Veenstra F, and Glette K (2022) in *2022 International Joint Conference on Neural Networks (IJCNN)*
+
+https://doi.org/10.1109/IJCNN55064.2022.9891909
 
 ## Paper2: Central pattern generators evolved for real-time adaptation to rhythmic stimuli
 
@@ -36,4 +36,4 @@ This is a Python+Unity implementation. Short-legged quadruped agents from Paper2
 
 Szorkovszky A, Veenstra F and Glette K (2023). *Frontiers in Robotics and AI*, 10:1232708.
 
-https://www.frontiersin.org/articles/10.3389/frobt.2023.1232708/full
+https://doi.org/10.3389/frobt.2023.1232708
