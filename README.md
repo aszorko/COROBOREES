@@ -4,7 +4,9 @@
 [![Youtube: example of social learning in simulation](https://img.youtube.com/vi/rARNARMTKqo/0.jpg)](https://www.youtube.com/watch?v=rARNARMTKqo)
 
 
-## Unity executables (coming soon)
+## Unity executables (Linux only)
+
+Download and unzip Unity.zip (contains auxilary files) and UnityHebb.zip (contains quadruped and hexapod executables with foot sensors).
 
 ## Evaluation
 
@@ -19,4 +21,4 @@ Data is contained in the `CPG/paper4_data/` directory.
 will run analyses on these data and produce Figures 2,4,5,6b and statistics.
 
 `$python CPG/paper4_results2.py`
-generates Figure 3 and Figure 6a using the Unity interface. Must be run from command line in the virtual environment.
+generates Figure 3 and Figure 6a using the Unity interface. Must be run from command line in the virtual environment (see instructions in master branch).
